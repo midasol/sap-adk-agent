@@ -13,7 +13,7 @@ set -e
 # ============================================================================
 # Configuration - Modify these values for your environment
 # ============================================================================
-PROJECT_ID="${PROJECT_ID:-sap-advanced-workshop-gck}"
+PROJECT_ID="${PROJECT_ID:-[your-project-id]}"
 REGION="${REGION:-us-central1}"
 
 # Colors for output

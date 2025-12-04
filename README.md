@@ -580,11 +580,13 @@ python scripts/deploy_agent_engine.py
 
 ### Manual Setup
 
+> **Important**: Replace all placeholder values (e.g., `your-project-id`, IP addresses) with your actual GCP project and environment settings.
+
 #### Step 1: Enable APIs
 
 ```bash
 # Set project
-export PROJECT_ID="your-project-id"
+export PROJECT_ID="[your-project-id]"
 gcloud config set project $PROJECT_ID
 
 # Enable required APIs
@@ -612,7 +614,8 @@ gcloud iam service-accounts create agent-engine-sa \
 #### Step 3: Configure IAM Permissions
 
 ```bash
-PROJECT_ID="your-project-id"
+# ⚠️ Replace with your actual GCP project ID
+PROJECT_ID="[your-project-id]"
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
 
 # Grant roles to Agent Engine service account
@@ -690,17 +693,20 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 ## Environment Configuration
 
+> **Note**: All configuration values shown in this documentation are **examples only**. You must replace them with values specific to your environment (project IDs, IP addresses, credentials, etc.).
+
 ### Local Development Environment
 
 Create `.env` file for SAP credentials:
 
 ```bash
 # sap_agent/.env
-SAP_HOST=your-sap-host.com
-SAP_PORT=44300
-SAP_CLIENT=100
-SAP_USERNAME=your_username
-SAP_PASSWORD=your_password
+# ⚠️ EXAMPLE VALUES - Replace with your actual SAP environment settings
+SAP_HOST=your-sap-host.com          # Example: sap-gateway.company.com
+SAP_PORT=44300                       # Example: 44300 (HTTPS) or 8000 (HTTP)
+SAP_CLIENT=100                       # Example: 100, 200, 800
+SAP_USERNAME=your_username           # Your SAP user ID
+SAP_PASSWORD=your_password           # Your SAP password
 ```
 
 ### Google Cloud Authentication
@@ -710,7 +716,7 @@ SAP_PASSWORD=your_password
 gcloud auth application-default login
 
 # Set project
-gcloud config set project YOUR_PROJECT_ID
+gcloud config set project [your-project-id]
 ```
 
 ### Secret Manager Setup (For Deployment)
@@ -720,6 +726,7 @@ gcloud config set project YOUR_PROJECT_ID
 gcloud secrets create sap-credentials --replication-policy="automatic"
 
 # Set secret value
+# ⚠️ EXAMPLE VALUES - Replace with your actual SAP environment settings
 echo '{
   "host": "10.142.0.5",
   "port": 44300,
@@ -727,6 +734,10 @@ echo '{
   "username": "YOUR_USERNAME",
   "password": "YOUR_PASSWORD"
 }' | gcloud secrets versions add sap-credentials --data-file=-
+# host: Your SAP Gateway internal IP (e.g., 10.x.x.x for PSC)
+# port: SAP Gateway port (typically 44300 for HTTPS)
+# client: SAP client number (e.g., 100, 200, 800)
+# username/password: Your SAP system credentials
 ```
 
 ---
@@ -778,7 +789,8 @@ print(result)
 from vertexai import agent_engines
 
 # Load deployed Agent
-agent = agent_engines.get("projects/PROJECT_NUMBER/locations/REGION/reasoningEngines/AGENT_ID")
+# ⚠️ Replace with your actual resource path from deployment output
+agent = agent_engines.get("projects/[your-project-number]/locations/[region]/reasoningEngines/[agent-id]")
 
 # Create session and query
 session = agent.create_session()
@@ -802,14 +814,16 @@ The deployment script performs the following:
 2. Wrap Agent as AdkApp
 3. Deploy to Agent Engine with PSC network configuration
 
-### Deployment Configuration
+### Deployment Configuration (Example)
 
-| Item | Value |
-|------|-------|
-| Region | us-central1 |
-| Model | gemini-2.5-pro |
-| Network | PSC (Private Service Connect) |
-| Service Account | agent-engine-sa@PROJECT.iam.gserviceaccount.com |
+> **Note**: Replace PROJECT with your actual GCP project ID.
+
+| Item | Example Value | Description |
+|------|---------------|-------------|
+| Region | us-central1 | Deployment region (adjust as needed) |
+| Model | gemini-2.5-pro | LLM model |
+| Network | PSC (Private Service Connect) | Network type |
+| Service Account | agent-engine-sa@{PROJECT}.iam.gserviceaccount.com | Replace {PROJECT} with your project ID |
 
 ### Verify Deployment
 

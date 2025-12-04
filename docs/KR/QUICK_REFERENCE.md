@@ -40,7 +40,7 @@ gcloud iam service-accounts create agent-engine-sa \
 ## IAM 역할 부여
 
 ```bash
-PROJECT_ID="your-project-id"
+PROJECT_ID="[your-project-id]"
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
 SA_EMAIL="agent-engine-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -112,7 +112,7 @@ echo '{
 
 ```bash
 # 환경 변수로 커스터마이징 가능
-export PROJECT_ID="your-project-id"
+export PROJECT_ID="[your-project-id]"
 export VPC_NAME="your-vpc-network"
 export SAP_IP="10.x.x.x"
 
@@ -124,7 +124,7 @@ export SAP_IP="10.x.x.x"
 ```python
 from vertexai import agent_engines
 
-agent = agent_engines.get("projects/110191959938/locations/us-central1/reasoningEngines/5675639440161112064")
+agent = agent_engines.get("projects/[your-project-number]/locations/us-central1/reasoningEngines/[your-agent-id]")
 session = agent.create_session()
 response = session.send_message("SAP 서비스 목록 보여줘")
 ```

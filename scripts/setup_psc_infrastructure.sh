@@ -16,7 +16,7 @@ set -e
 # ============================================================================
 # Configuration - Modify these values for your environment
 # ============================================================================
-PROJECT_ID="${PROJECT_ID:-sap-advanced-workshop-gck}"
+PROJECT_ID="${PROJECT_ID:-[your-project-id]}"
 REGION="${REGION:-us-central1}"
 VPC_NAME="${VPC_NAME:-sap-cal-default-network}"
 PSC_SUBNET_NAME="${PSC_SUBNET_NAME:-psc-attachment-subnet}"

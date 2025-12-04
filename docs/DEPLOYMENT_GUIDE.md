@@ -95,6 +95,8 @@ flowchart TB
 
 ## Prerequisites
 
+> **Important**: All IP addresses, project IDs, credentials, and resource names shown in this documentation are **examples only**. You must replace them with values specific to your environment.
+
 ### GCP Resources
 - Vertex AI API enabled
 - Secret Manager API enabled
@@ -122,6 +124,7 @@ flowchart TB
 gcloud secrets create sap-credentials --replication-policy="automatic"
 
 # Set secret value (JSON format)
+# ⚠️ EXAMPLE VALUES - Replace with your actual SAP environment settings
 echo '{
   "host": "10.142.0.5",
   "port": 44300,
@@ -129,6 +132,10 @@ echo '{
   "username": "YOUR_USERNAME",
   "password": "YOUR_PASSWORD"
 }' | gcloud secrets versions add sap-credentials --data-file=-
+# host: Your SAP Gateway internal IP (e.g., 10.x.x.x for PSC access)
+# port: SAP Gateway port (typically 44300 for HTTPS, 8000 for HTTP)
+# client: SAP client number (e.g., 100, 200, 800)
+# username/password: Your SAP system credentials
 ```
 
 ### Network Setup
@@ -166,7 +173,7 @@ tools = [sap_list_services, sap_query, sap_get_entity]
 
 **Symptom**:
 ```
-Error: Caller does not have required permission to use project sap-advanced-workshop-gck.
+Error: Caller does not have required permission to use project [your-project-id].
 Grant the caller the roles/serviceusage.serviceUsageConsumer role
 ```
 
@@ -175,8 +182,8 @@ Grant the caller the roles/serviceusage.serviceUsageConsumer role
 **Solution**:
 ```bash
 # Grant permissions to all related service accounts
-PROJECT_ID="sap-advanced-workshop-gck"
-PROJECT_NUMBER="110191959938"
+PROJECT_ID="[your-project-id]"
+PROJECT_NUMBER="[your-project-number]"
 
 for SA in \
   "service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
@@ -313,9 +320,9 @@ echo '{
 
 ```bash
 # Project configuration
-export PROJECT_ID="sap-advanced-workshop-gck"
+export PROJECT_ID="[your-project-id]"
 export REGION="us-central1"
-export STAGING_BUCKET="gs://sap-advanced-workshop-gck_cloudbuild"
+export STAGING_BUCKET="gs://[your-project-id]_cloudbuild"
 
 # Authentication
 gcloud auth application-default login
@@ -453,7 +460,7 @@ root_agent = Agent(
 from vertexai import agent_engines
 
 # Load deployed Agent
-agent = agent_engines.get("projects/PROJECT_NUMBER/locations/REGION/reasoningEngines/AGENT_ID")
+agent = agent_engines.get("projects/[your-project-number]/locations/[region]/reasoningEngines/[agent-id]")
 
 # Create session and query
 session = agent.create_session()
@@ -520,12 +527,12 @@ Connection timeout or Connection refused
 
 | Item | Value |
 |------|-------|
-| Project ID | sap-advanced-workshop-gck |
-| Project Number | 110191959938 |
+| Project ID | [your-project-id] |
+| Project Number | [your-project-number] |
 | Region | us-central1 |
-| Agent Engine ID | 5675639440161112064 |
-| Resource Name | projects/110191959938/locations/us-central1/reasoningEngines/5675639440161112064 |
-| Service Account | agent-engine-sa@sap-advanced-workshop-gck.iam.gserviceaccount.com |
+| Agent Engine ID | [your-agent-id] |
+| Resource Name | projects/[your-project-number]/locations/us-central1/reasoningEngines/[your-agent-id] |
+| Service Account | agent-engine-sa@[your-project-id].iam.gserviceaccount.com |
 | Network Attachment | agent-engine-attachment |
 | SAP Host (Internal) | 10.142.0.5:44300 |
 

@@ -10,7 +10,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Ensure PROJECT_ID is set in os.environ for Secret Manager access
-PROJECT_ID = os.getenv("PROJECT_ID", "sap-advanced-workshop-gck")
+PROJECT_ID = os.getenv("PROJECT_ID")
+if not PROJECT_ID:
+    raise ValueError("PROJECT_ID environment variable must be set")
 os.environ["PROJECT_ID"] = PROJECT_ID
 os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT_ID  # For consistency
 
@@ -28,7 +30,7 @@ else:
 
 # Configuration
 LOCATION = os.getenv("REGION", "us-central1")
-STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://sap-advanced-workshop-gck_cloudbuild")
+STAGING_BUCKET = os.getenv("STAGING_BUCKET", f"gs://{PROJECT_ID}_cloudbuild")
 NETWORK_ATTACHMENT = f"projects/{PROJECT_ID}/regions/{LOCATION}/networkAttachments/agent-engine-attachment"
 
 print(f"Initializing Vertex AI SDK...")

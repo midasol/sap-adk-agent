@@ -174,7 +174,7 @@ flowchart TB
     subgraph GCP["Google Cloud Platform (us-central1)"]
         subgraph VPC["VPC Network"]
             subgraph AgentEngine["Vertex AI Agent Engine"]
-                AE["🤖 SAP Agent<br/>ReasoningEngine ID: 5675639440161112064"]
+                AE["🤖 SAP Agent<br/>ReasoningEngine ID: [your-agent-id]"]
             end
 
             subgraph PSCZone["Private Service Connect Zone"]

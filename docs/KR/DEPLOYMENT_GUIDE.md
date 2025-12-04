@@ -166,7 +166,7 @@ tools = [sap_list_services, sap_query, sap_get_entity]
 
 **증상**:
 ```
-Error: Caller does not have required permission to use project sap-advanced-workshop-gck.
+Error: Caller does not have required permission to use project [your-project-id].
 Grant the caller the roles/serviceusage.serviceUsageConsumer role
 ```
 
@@ -175,8 +175,8 @@ Grant the caller the roles/serviceusage.serviceUsageConsumer role
 **해결**:
 ```bash
 # 모든 관련 서비스 계정에 권한 부여
-PROJECT_ID="sap-advanced-workshop-gck"
-PROJECT_NUMBER="110191959938"
+PROJECT_ID="[your-project-id]"
+PROJECT_NUMBER="[your-project-number]"
 
 for SA in \
   "service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
@@ -313,9 +313,9 @@ echo '{
 
 ```bash
 # 프로젝트 설정
-export PROJECT_ID="sap-advanced-workshop-gck"
+export PROJECT_ID="[your-project-id]"
 export REGION="us-central1"
-export STAGING_BUCKET="gs://sap-advanced-workshop-gck_cloudbuild"
+export STAGING_BUCKET="gs://[your-project-id]_cloudbuild"
 
 # 인증
 gcloud auth application-default login
@@ -453,7 +453,7 @@ root_agent = Agent(
 from vertexai import agent_engines
 
 # 배포된 Agent 로드
-agent = agent_engines.get("projects/PROJECT_NUMBER/locations/REGION/reasoningEngines/AGENT_ID")
+agent = agent_engines.get("projects/[your-project-number]/locations/[region]/reasoningEngines/[your-agent-id]")
 
 # 세션 생성 및 쿼리
 session = agent.create_session()
@@ -520,12 +520,12 @@ Connection timeout 또는 Connection refused
 
 | 항목 | 값 |
 |------|-----|
-| Project ID | sap-advanced-workshop-gck |
-| Project Number | 110191959938 |
+| Project ID | [your-project-id] |
+| Project Number | [your-project-number] |
 | Region | us-central1 |
-| Agent Engine ID | 5675639440161112064 |
-| Resource Name | projects/110191959938/locations/us-central1/reasoningEngines/5675639440161112064 |
-| Service Account | agent-engine-sa@sap-advanced-workshop-gck.iam.gserviceaccount.com |
+| Agent Engine ID | [your-agent-id] |
+| Resource Name | projects/[your-project-number]/locations/us-central1/reasoningEngines/[your-agent-id] |
+| Service Account | agent-engine-sa@[your-project-id].iam.gserviceaccount.com |
 | Network Attachment | agent-engine-attachment |
 | SAP Host (Internal) | 10.142.0.5:44300 |
 
