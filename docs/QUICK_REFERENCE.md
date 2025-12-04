@@ -23,7 +23,7 @@ gcloud ai reasoning-engines list --region=us-central1
 
 | 이슈 | 해결 |
 |------|------|
-| MCP subprocess 불가 | Direct Python 함수로 전환 |
+| Gateway subprocess 불가 | Direct Python 함수로 전환 |
 | serviceUsageConsumer 권한 | 서비스 계정에 역할 부여 |
 | Secret Manager import 오류 | Lazy loading 패턴 적용 |
 | Event loop 충돌 | `nest_asyncio` 추가 |
@@ -64,23 +64,39 @@ response = session.send_message("SAP 서비스 목록 보여줘")
 
 ## 파일 구조
 
-```
-agent-adk-sap-mcp/
-├── sap_agent/
-│   ├── agent.py              # 메인 Agent 정의
-│   ├── services.yaml         # SAP 서비스 설정
-│   └── sap_mcp_server/
-│       ├── config/
-│       │   ├── settings.py   # SAP 연결 설정
-│       │   ├── loader.py     # YAML 로더
-│       │   └── schemas.py    # Pydantic 스키마
-│       └── core/
-│           └── sap_client.py # SAP HTTP 클라이언트
-├── scripts/
-│   └── deploy_agent_engine.py
-└── docs/
-    ├── DEPLOYMENT_GUIDE.md   # 상세 가이드
-    └── QUICK_REFERENCE.md    # 이 문서
+```mermaid
+flowchart LR
+    subgraph Root["📁 agent-adk-sap-gw/"]
+        subgraph SapAgent["📁 sap_agent/"]
+            AgentPy["🤖 agent.py"]
+            ServicesYaml["⚙️ services.yaml"]
+
+            subgraph GWConnector["📁 sap_gw_connector/"]
+                subgraph Config["📁 config/"]
+                    Settings["settings.py"]
+                    Loader["loader.py"]
+                    Schemas["schemas.py"]
+                end
+                subgraph Core["📁 core/"]
+                    SAPClient["sap_client.py"]
+                end
+            end
+        end
+
+        subgraph Scripts["📁 scripts/"]
+            Deploy["deploy_agent_engine.py"]
+        end
+
+        subgraph Docs["📁 docs/"]
+            Guide["DEPLOYMENT_GUIDE.md"]
+            Quick["QUICK_REFERENCE.md"]
+        end
+    end
+
+    style SapAgent fill:#e3f2fd,stroke:#1976d2
+    style GWConnector fill:#e8f5e9,stroke:#388e3c
+    style Scripts fill:#fff3e0,stroke:#f57c00
+    style Docs fill:#fce4ec,stroke:#c2185b
 ```
 
 ## 디버깅 팁

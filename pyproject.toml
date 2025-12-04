@@ -1,7 +1,7 @@
 [project]
-name = "agent-adk-sap-mcp"
+name = "agent-adk-sap-gw"
 version = "0.1.0"
-description = "SAP Gateway integration agent using Google ADK and MCP protocol"
+description = "SAP Gateway integration agent using Google ADK"
 authors = [
     {name = "Your Name", email = "your@email.com"},
 ]

@@ -3,15 +3,15 @@
 import logging
 from typing import Any, Dict
 
-from sap_agent.sap_mcp_server.tools.base import MCPTool
-from sap_agent.sap_mcp_server.core.sap_client import SAPClient
-from sap_agent.sap_mcp_server.config.loader import get_services_config
-from sap_agent.sap_mcp_server.config.settings import get_services_config_path
+from sap_agent.sap_gw_connector.tools.base import SAPTool
+from sap_agent.sap_gw_connector.core.sap_client import SAPClient
+from sap_agent.sap_gw_connector.config.loader import get_services_config
+from sap_agent.sap_gw_connector.config.settings import get_services_config_path
 
 logger = logging.getLogger(__name__)
 
 
-class SAPGetEntityTool(MCPTool):
+class SAPGetEntityTool(SAPTool):
     """Tool for retrieving a single SAP entity by key"""
 
     @property
@@ -47,7 +47,7 @@ class SAPGetEntityTool(MCPTool):
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Retrieve entity by key"""
         try:
-            from sap_agent.sap_mcp_server.config.settings import get_config
+            from sap_agent.sap_gw_connector.config.settings import get_config
 
             config = get_config(require_sap=True)
 

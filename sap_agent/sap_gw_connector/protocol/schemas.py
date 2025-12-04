@@ -1,4 +1,4 @@
-"""MCP Protocol schema definitions"""
+"""SAP Gateway Protocol schema definitions"""
 
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
-class MCPMethodType(str, Enum):
-    """MCP method types"""
+class GWMethodType(str, Enum):
+    """Gateway method types"""
 
     CALL_TOOL = "tools/call"
     LIST_TOOLS = "tools/list"
@@ -19,8 +19,8 @@ class MCPMethodType(str, Enum):
     UNSUBSCRIBE = "resources/unsubscribe"
 
 
-class MCPRequest(BaseModel):
-    """MCP request schema"""
+class GWRequest(BaseModel):
+    """Gateway request schema"""
 
     jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
     id: Union[str, int] = Field(..., description="Request ID")
@@ -30,17 +30,17 @@ class MCPRequest(BaseModel):
     )
 
 
-class MCPResponse(BaseModel):
-    """MCP response schema"""
+class GWResponse(BaseModel):
+    """Gateway response schema"""
 
     jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
     id: Union[str, int] = Field(..., description="Request ID")
     result: Optional[Any] = Field(default=None, description="Method result")
-    error: Optional["MCPError"] = Field(default=None, description="Error details")
+    error: Optional["GWError"] = Field(default=None, description="Error details")
 
 
-class MCPError(BaseModel):
-    """MCP error schema"""
+class GWError(BaseModel):
+    """Gateway error schema"""
 
     code: int = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
@@ -93,4 +93,4 @@ class HealthResponse(BaseModel):
 
 
 # Forward reference resolution
-MCPResponse.model_rebuild()
+GWResponse.model_rebuild()

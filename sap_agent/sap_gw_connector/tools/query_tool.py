@@ -3,15 +3,15 @@
 import logging
 from typing import Any, Dict, List
 
-from sap_agent.sap_mcp_server.config.loader import get_services_config
-from sap_agent.sap_mcp_server.config.settings import get_config
-from sap_agent.sap_mcp_server.core.sap_client import SAPClient
-from sap_agent.sap_mcp_server.tools.base import MCPTool
+from sap_agent.sap_gw_connector.config.loader import get_services_config
+from sap_agent.sap_gw_connector.config.settings import get_config
+from sap_agent.sap_gw_connector.core.sap_client import SAPClient
+from sap_agent.sap_gw_connector.tools.base import SAPTool
 
 logger = logging.getLogger(__name__)
 
 
-class SAPQueryTool(MCPTool):
+class SAPQueryTool(SAPTool):
     """Tool for querying SAP OData services"""
 
     @property

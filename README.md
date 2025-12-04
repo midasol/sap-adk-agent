@@ -52,6 +52,74 @@ SAP OData 서비스와 통합된 AI Agent를 Google Cloud의 Vertex AI Agent Eng
 
 ## 아키텍처
 
+### 아키텍처 개요
+
+이 프로젝트는 **3-Tier 아키텍처**를 기반으로 설계되었습니다:
+
+```mermaid
+flowchart TB
+    subgraph PresentationLayer["🎨 PRESENTATION LAYER"]
+        subgraph AgentEngine["Vertex AI Agent Engine"]
+            Gemini["🤖 Gemini 2.5 Pro + Google ADK"]
+            NLU["📝 자연어 이해 및 Intent 파싱"]
+            Orchestration["🔧 Tool 선택 및 오케스트레이션"]
+            Response["💬 응답 생성 및 포맷팅"]
+        end
+    end
+
+    subgraph ApplicationLayer["⚙️ APPLICATION LAYER"]
+        subgraph GWConnector["SAP Gateway Connector (sap_gw_connector)"]
+            subgraph ConfigMod["config/"]
+                Settings["settings"]
+                Schemas["schemas"]
+                Loader["loader"]
+            end
+            subgraph CoreMod["core/"]
+                SAPClient["sap_client"]
+                Auth["auth"]
+                Exceptions["exceptions"]
+            end
+            subgraph ToolsMod["tools/"]
+                QueryTool["query_tool"]
+                EntityTool["entity_tool"]
+                ServiceTool["service_tool"]
+            end
+            subgraph UtilsMod["utils/"]
+                Logger["logger"]
+                Validators["validators"]
+            end
+        end
+    end
+
+    subgraph DataLayer["💾 DATA LAYER"]
+        subgraph SAPGateway["SAP Gateway (OData v2)"]
+            SalesOrder["📦 Sales Order Service"]
+            Customer["👥 Customer Service"]
+            Material["📋 Material Service"]
+            Flight["✈️ Flight Booking Service"]
+        end
+    end
+
+    PresentationLayer -->|"Tool Calls"| ApplicationLayer
+    ApplicationLayer -->|"OData HTTP/S"| DataLayer
+
+    style PresentationLayer fill:#e3f2fd,stroke:#1976d2
+    style ApplicationLayer fill:#e8f5e9,stroke:#388e3c
+    style DataLayer fill:#fff3e0,stroke:#f57c00
+```
+
+### 핵심 설계 원칙
+
+| 원칙 | 설명 |
+|------|------|
+| **Separation of Concerns** | Agent, Connector, SAP 각 계층의 책임 분리 |
+| **Async-First** | aiohttp 기반 비동기 HTTP 클라이언트로 성능 최적화 |
+| **Configuration-Driven** | YAML 기반 서비스 설정으로 코드 변경 없이 확장 가능 |
+| **Security by Default** | CSRF 토큰, SSL, Secret Manager 통합 |
+| **Lazy Loading** | 런타임 권한 이슈 방지를 위한 지연 로딩 패턴 |
+
+---
+
 ### 시스템 아키텍처
 
 ```mermaid
@@ -92,6 +160,159 @@ flowchart TB
     GW --> OData
     Agent -->|"자연어 응답"| U
 ```
+
+---
+
+### 배포 아키텍처
+
+```mermaid
+flowchart TB
+    subgraph Internet["인터넷"]
+        Client["🌐 Client Application"]
+    end
+
+    subgraph GCP["Google Cloud Platform (us-central1)"]
+        subgraph VPC["VPC Network"]
+            subgraph AgentEngine["Vertex AI Agent Engine"]
+                AE["🤖 SAP Agent<br/>ReasoningEngine ID: 5675639440161112064"]
+            end
+
+            subgraph PSCZone["Private Service Connect Zone"]
+                NA["🔗 Network Attachment<br/>agent-engine-attachment"]
+            end
+        end
+
+        subgraph IAM["IAM & Security"]
+            SA["👤 Service Account<br/>agent-engine-sa@..."]
+            SM["🔐 Secret Manager<br/>sap-credentials"]
+        end
+
+        subgraph Storage["Cloud Storage"]
+            SB["📦 Staging Bucket<br/>gs://..._cloudbuild"]
+        end
+    end
+
+    subgraph OnPrem["On-Premises / Private Network"]
+        subgraph SAPZone["SAP Zone (10.142.0.0/24)"]
+            SAPGW["🏢 SAP Gateway<br/>10.142.0.5:44300"]
+        end
+    end
+
+    Client -->|"HTTPS"| AE
+    AE -->|"reads"| SM
+    AE -->|"uses"| SA
+    AE -->|"packages from"| SB
+    AE -->|"connects via"| NA
+    NA -->|"Private Network<br/>TCP 44300"| SAPGW
+
+    style AE fill:#4285f4,color:#fff
+    style SAPGW fill:#f4b400,color:#000
+    style SM fill:#34a853,color:#fff
+    style NA fill:#ea4335,color:#fff
+```
+
+---
+
+### 모듈 아키텍처
+
+```mermaid
+flowchart TB
+    subgraph AgentLayer["Agent Layer (sap_agent/)"]
+        Agent["agent.py<br/>🤖 Root Agent Definition"]
+        ServicesYAML["services.yaml<br/>⚙️ Service Configuration"]
+    end
+
+    subgraph ConnectorLayer["Gateway Connector Layer (sap_gw_connector/)"]
+        subgraph ConfigModule["config/"]
+            Settings["settings.py<br/>📝 Pydantic Settings"]
+            Schemas["schemas.py<br/>📋 YAML Schemas"]
+            Loader["loader.py<br/>📂 Config Loader"]
+        end
+
+        subgraph CoreModule["core/"]
+            SAPClient["sap_client.py<br/>📡 HTTP Client"]
+            Auth["auth.py<br/>🔐 CSRF Auth"]
+            Exceptions["exceptions.py<br/>⚠️ Error Types"]
+        end
+
+        subgraph ToolsModule["tools/"]
+            BaseTool["base.py<br/>🔧 SAPTool Base"]
+            QueryTool["query_tool.py<br/>🔍 Query Operations"]
+            EntityTool["entity_tool.py<br/>📄 Entity Operations"]
+            ServiceTool["service_tool.py<br/>📋 Service Discovery"]
+        end
+
+        subgraph UtilsModule["utils/"]
+            Logger["logger.py<br/>📊 Structured Logging"]
+            Validators["validators.py<br/>✅ Input Validation"]
+        end
+    end
+
+    Agent -->|"imports"| SAPClient
+    Agent -->|"loads"| ServicesYAML
+    ServicesYAML -->|"parsed by"| Loader
+    Loader -->|"validates with"| Schemas
+    SAPClient -->|"configured by"| Settings
+    SAPClient -->|"authenticates via"| Auth
+    SAPClient -->|"raises"| Exceptions
+    QueryTool -->|"extends"| BaseTool
+    EntityTool -->|"extends"| BaseTool
+    ServiceTool -->|"extends"| BaseTool
+    BaseTool -->|"uses"| SAPClient
+
+    style Agent fill:#4285f4,color:#fff
+    style SAPClient fill:#34a853,color:#fff
+    style Auth fill:#ea4335,color:#fff
+```
+
+---
+
+### 보안 아키텍처
+
+```mermaid
+flowchart LR
+    subgraph SecurityLayers["보안 계층"]
+        direction TB
+
+        subgraph L1["Layer 1: 네트워크 보안"]
+            PSC["Private Service Connect<br/>내부 네트워크 격리"]
+            FW["Firewall Rules<br/>Port 44300 Only"]
+        end
+
+        subgraph L2["Layer 2: 인증/인가"]
+            SM["Secret Manager<br/>자격증명 암호화 저장"]
+            SA["Service Account<br/>최소 권한 원칙"]
+            CSRF["CSRF Token<br/>요청별 토큰 검증"]
+        end
+
+        subgraph L3["Layer 3: 전송 보안"]
+            TLS["TLS/SSL<br/>HTTPS 암호화"]
+            CERT["Certificate Validation<br/>(개발: verify_ssl=false)"]
+        end
+
+        subgraph L4["Layer 4: 런타임 보안"]
+            LAZY["Lazy Loading<br/>권한 시점 지연"]
+            ENV["Environment Variables<br/>런타임 주입"]
+        end
+    end
+
+    L1 --> L2 --> L3 --> L4
+
+    style PSC fill:#ea4335,color:#fff
+    style SM fill:#34a853,color:#fff
+    style TLS fill:#4285f4,color:#fff
+    style LAZY fill:#f4b400,color:#000
+```
+
+#### 보안 구성 요소
+
+| 구성 요소 | 설명 | 구현 위치 |
+|----------|------|----------|
+| **Secret Manager** | SAP 자격증명 암호화 저장 | `agent.py:load_secrets_from_manager()` |
+| **CSRF Token** | SAP 요청 무결성 검증 | `core/auth.py:SAPAuthenticator` |
+| **Private Service Connect** | VPC 내부 네트워크 통신 | 배포 설정 `psc_interface_config` |
+| **Service Account** | 최소 권한 IAM 역할 | `agent-engine-sa@...` |
+| **Lazy Loading** | Import 시점 권한 이슈 방지 | `agent.py:_get_secret_manager()` |
 
 ### 컴포넌트 다이어그램
 
@@ -227,52 +448,75 @@ flowchart LR
 
 ## 프로젝트 구조
 
+```mermaid
+flowchart LR
+    subgraph Root["📁 agent-adk-sap-gw/"]
+        direction TB
+
+        subgraph SapAgent["📁 sap_agent/ - 메인 에이전트 패키지"]
+            AgentPy["🤖 agent.py<br/>Google ADK Agent"]
+            ServicesYaml["⚙️ services.yaml<br/>OData 서비스 설정"]
+
+            subgraph GWConnector["📁 sap_gw_connector/ - SAP Gateway 통신"]
+                subgraph Config["📁 config/"]
+                    SettingsPy["📝 settings.py"]
+                    SchemasPy["📋 schemas.py"]
+                    LoaderPy["📂 loader.py"]
+                end
+
+                subgraph Core["📁 core/"]
+                    SAPClientPy["📡 sap_client.py"]
+                    AuthPy["🔐 auth.py"]
+                    ExceptionsPy["⚠️ exceptions.py"]
+                end
+
+                subgraph Tools["📁 tools/"]
+                    BasePy["🔧 base.py"]
+                    QueryToolPy["🔍 query_tool.py"]
+                    EntityToolPy["📄 entity_tool.py"]
+                    ServiceToolPy["📋 service_tool.py"]
+                end
+
+                subgraph Utils["📁 utils/"]
+                    LoggerPy["📊 logger.py"]
+                    ValidatorsPy["✅ validators.py"]
+                end
+            end
+        end
+
+        subgraph Scripts["📁 scripts/ - 배포 스크립트"]
+            DeployPy["🚀 deploy_agent_engine.py"]
+            TestPy["🧪 test_*.py"]
+            CleanupPy["🧹 cleanup_agent_engines.py"]
+        end
+
+        subgraph Docs["📁 docs/ - 문서"]
+            DeployGuide["📚 DEPLOYMENT_GUIDE.md"]
+            QuickRef["📋 QUICK_REFERENCE.md"]
+        end
+
+        PyProject["📦 pyproject.toml"]
+        Readme["📄 README.md"]
+    end
+
+    style SapAgent fill:#e3f2fd,stroke:#1976d2
+    style GWConnector fill:#e8f5e9,stroke:#388e3c
+    style Scripts fill:#fff3e0,stroke:#f57c00
+    style Docs fill:#fce4ec,stroke:#c2185b
 ```
-agent-adk-sap-mcp/
-├── sap_agent/                      # 메인 에이전트 패키지
-│   ├── __init__.py
-│   ├── agent.py                    # 🤖 Google ADK Agent 정의
-│   ├── services.yaml               # ⚙️ SAP OData 서비스 설정
-│   └── sap_mcp_server/             # SAP 통신 모듈
-│       ├── __init__.py
-│       ├── config/                 # 설정 관리
-│       │   ├── __init__.py
-│       │   ├── settings.py         # Pydantic 설정 클래스
-│       │   ├── schemas.py          # YAML 스키마 정의
-│       │   └── loader.py           # YAML 로더
-│       ├── core/                   # 핵심 기능
-│       │   ├── __init__.py
-│       │   ├── sap_client.py       # 📡 SAP HTTP 클라이언트
-│       │   ├── auth.py             # 🔐 CSRF 인증
-│       │   └── exceptions.py       # 예외 정의
-│       ├── tools/                  # MCP 도구 클래스
-│       │   ├── __init__.py
-│       │   ├── base.py             # 기본 도구 클래스
-│       │   ├── query_tool.py       # 쿼리 도구
-│       │   ├── entity_tool.py      # 엔티티 도구
-│       │   ├── service_tool.py     # 서비스 도구
-│       │   └── auth_tool.py        # 인증 도구
-│       ├── transports/             # 전송 계층
-│       │   └── stdio.py            # STDIO 전송
-│       ├── protocol/               # 프로토콜 정의
-│       │   └── schemas.py
-│       └── utils/                  # 유틸리티
-│           ├── logger.py
-│           └── validators.py
-├── scripts/                        # 배포 및 테스트 스크립트
-│   ├── deploy_agent_engine.py      # 🚀 Agent Engine 배포
-│   ├── deploy.sh                   # 배포 셸 스크립트
-│   ├── test_agent_engine.py        # 테스트
-│   ├── test_deployed_sap_agent.py
-│   ├── test_remote_agent_v2.py
-│   └── cleanup_agent_engines.py    # 정리 스크립트
-├── docs/                           # 문서
-│   ├── DEPLOYMENT_GUIDE.md         # 📚 상세 배포 가이드
-│   └── QUICK_REFERENCE.md          # 📋 빠른 참조
-├── pyproject.toml                  # 📦 프로젝트 설정
-├── .gcloudignore                   # GCloud 제외 파일
-└── README.md                       # 이 문서
-```
+
+### 디렉토리 구조 상세
+
+| 디렉토리 | 설명 |
+|----------|------|
+| `sap_agent/` | 메인 에이전트 패키지 (Google ADK Agent 정의) |
+| `sap_agent/sap_gw_connector/` | SAP Gateway 통신 모듈 |
+| `sap_agent/sap_gw_connector/config/` | Pydantic 설정 및 YAML 스키마 |
+| `sap_agent/sap_gw_connector/core/` | SAP HTTP 클라이언트 및 인증 |
+| `sap_agent/sap_gw_connector/tools/` | SAP 도구 클래스 (Query, Entity, Service) |
+| `sap_agent/sap_gw_connector/utils/` | 로깅 및 유틸리티 |
+| `scripts/` | 배포 및 테스트 스크립트 |
+| `docs/` | 배포 가이드 및 참조 문서 |
 
 ### 주요 파일 설명
 
@@ -280,9 +524,9 @@ agent-adk-sap-mcp/
 |------|------|
 | `sap_agent/agent.py` | Google ADK Agent 정의, 3개의 SAP 도구 함수 포함 |
 | `sap_agent/services.yaml` | SAP OData 서비스 및 엔티티 설정 |
-| `sap_agent/sap_mcp_server/core/sap_client.py` | aiohttp 기반 비동기 SAP HTTP 클라이언트 |
-| `sap_agent/sap_mcp_server/core/auth.py` | CSRF 토큰 기반 SAP 인증 처리 |
-| `sap_agent/sap_mcp_server/config/settings.py` | Pydantic 기반 환경 설정 관리 |
+| `sap_agent/sap_gw_connector/core/sap_client.py` | aiohttp 기반 비동기 SAP HTTP 클라이언트 |
+| `sap_agent/sap_gw_connector/core/auth.py` | CSRF 토큰 기반 SAP 인증 처리 |
+| `sap_agent/sap_gw_connector/config/settings.py` | Pydantic 기반 환경 설정 관리 |
 | `scripts/deploy_agent_engine.py` | Vertex AI Agent Engine 배포 스크립트 |
 
 ---
@@ -301,7 +545,7 @@ agent-adk-sap-mcp/
 ```bash
 # 저장소 클론
 git clone <repository-url>
-cd agent-adk-sap-mcp
+cd agent-adk-sap-gw
 
 # 가상환경 생성 및 활성화
 python -m venv .venv
@@ -484,7 +728,7 @@ pytest --cov=sap_agent
 
 | 이슈 | 해결 방법 |
 |------|----------|
-| MCP subprocess 불가 | Direct Python 함수로 전환됨 |
+| Gateway subprocess 불가 | Direct Python 함수로 전환됨 |
 | serviceUsageConsumer 권한 오류 | 서비스 계정에 역할 부여 |
 | Secret Manager import 오류 | Lazy loading 패턴 적용됨 |
 | Event loop 충돌 | `nest_asyncio` 패키지 사용 |

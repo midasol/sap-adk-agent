@@ -1,8 +1,8 @@
-"""Stdio-based MCP Server implementation"""
+"""Stdio-based Gateway Server implementation"""
 
 import sys
 # Debug print at the very top level
-print("[DEBUG] sap_mcp_server.transports.stdio module loaded", file=sys.stderr)
+print("[DEBUG] sap_gw_connector.transports.stdio module loaded", file=sys.stderr)
 
 import asyncio
 import logging
@@ -14,9 +14,9 @@ from mcp import types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from sap_agent.sap_mcp_server.tools import tool_registry
-from sap_agent.sap_mcp_server.protocol.schemas import ToolCallRequest
-from sap_agent.sap_mcp_server.config.settings import SAPConnectionConfig, MCPServerConfig, SecurityConfig, AppConfig
+from sap_agent.sap_gw_connector.tools import tool_registry
+from sap_agent.sap_gw_connector.protocol.schemas import ToolCallRequest
+from sap_agent.sap_gw_connector.config.settings import SAPConnectionConfig, GWServerConfig, SecurityConfig, AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def main(sap_connection_args: dict) -> None:
     """Main entry point for stdio MCP server"""
     sys.stderr.write("[DEBUG] Entering async main...\n")
 
-    # Load environment variables (still useful for non-SAP MCP config)
+    # Load environment variables (still useful for non-SAP Gateway config)
     env_path = find_env_file()
     if env_path:
         load_dotenv(dotenv_path=env_path)
@@ -62,26 +62,26 @@ async def main(sap_connection_args: dict) -> None:
     # Bypass environment variable lookup for SAP credentials
     sap_config = SAPConnectionConfig(**sap_connection_args)
     
-    # Manually initialize the global config instance for MCP Server
+    # Manually initialize the global config instance for Gateway Server
     # This part should ideally be refactored into a proper config loading utility
-    # but for now, we ensure the MCP server's internal config is set up.
+    # but for now, we ensure the Gateway server's internal config is set up.
     # We create a dummy AppConfig to hold the SAP config
     try:
         global_app_config = AppConfig(
             sap=sap_config,
-            server=MCPServerConfig(), # Load server config from env vars
+            server=GWServerConfig(), # Load server config from env vars
             security=SecurityConfig(), # Load security config from env vars
         )
         # Override the global config instance in settings.py
-        from sap_agent.sap_mcp_server.config import settings
+        from sap_agent.sap_gw_connector.config import settings
         settings.config = global_app_config
         sys.stderr.write("[DEBUG] AppConfig initialized successfully.\n")
     except Exception as e:
         sys.stderr.write(f"[DEBUG] Error initializing AppConfig: {e}\n")
         raise
 
-    # Create MCP server
-    server = Server("sap-mcp")
+    # Create Gateway server
+    server = Server("sap-gw")
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
@@ -119,7 +119,7 @@ async def main(sap_connection_args: dict) -> None:
             return [types.TextContent(type="text", text=f"Error: {str(e)}")]
 
     # Run the server
-    logger.info("Starting SAP MCP stdio server...")
+    logger.info("Starting SAP Gateway stdio server...")
     sys.stderr.write("[DEBUG] Starting stdio server run loop...\n")
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
@@ -129,7 +129,7 @@ async def main(sap_connection_args: dict) -> None:
 
 def cli_main() -> None:
     """CLI entry point for console_scripts"""
-    sys.stderr.write("[DEBUG] Starting sap-mcp-server-stdio CLI main...\n")
+    sys.stderr.write("[DEBUG] Starting sap-gw-server-stdio CLI main...\n")
     
     # Configure logging
     logging.basicConfig(
@@ -137,7 +137,7 @@ def cli_main() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    parser = argparse.ArgumentParser(description="SAP MCP Stdio Server")
+    parser = argparse.ArgumentParser(description="SAP Gateway Stdio Server")
     parser.add_argument("--sap-host", required=True, help="SAP server hostname")
     parser.add_argument("--sap-port", type=int, default=44300, help="SAP server port")
     parser.add_argument("--sap-client", default="100", help="SAP client number")
@@ -167,7 +167,7 @@ def cli_main() -> None:
         "retry_attempts": args.sap_retry_attempts,
     }
 
-    logger.debug(f"MCP Server received SAP connection arguments: {sap_connection_args['host']}:{sap_connection_args['port']} client {sap_connection_args['client']}")
+    logger.debug(f"Gateway Server received SAP connection arguments: {sap_connection_args['host']}:{sap_connection_args['port']} client {sap_connection_args['client']}")
 
     # Run async main
     try:

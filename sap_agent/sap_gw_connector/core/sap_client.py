@@ -8,11 +8,11 @@ from typing import Any, Dict, List, Optional, Union, cast
 import aiohttp
 import xmltodict
 
-from sap_agent.sap_mcp_server.config.schemas import GatewayConfig
-from sap_agent.sap_mcp_server.config.loader import get_services_config
-from sap_agent.sap_mcp_server.config.settings import SAPConnectionConfig, get_services_config_path
-from sap_agent.sap_mcp_server.core.auth import SAPAuthenticator
-from sap_agent.sap_mcp_server.core.exceptions import (
+from sap_agent.sap_gw_connector.config.schemas import GatewayConfig
+from sap_agent.sap_gw_connector.config.loader import get_services_config
+from sap_agent.sap_gw_connector.config.settings import SAPConnectionConfig, get_services_config_path
+from sap_agent.sap_gw_connector.core.auth import SAPAuthenticator
+from sap_agent.sap_gw_connector.core.exceptions import (
     SAPAuthenticationError,
     SAPConnectionError,
     SAPRequestError,
@@ -37,7 +37,7 @@ class SAPClient:
 
         # Load gateway configuration
         if gateway_config is None:
-            from sap_agent.sap_mcp_server.config.loader import get_services_config
+            from sap_agent.sap_gw_connector.config.loader import get_services_config
 
             self.services_config = get_services_config(get_services_config_path())
             self.gateway_config = self.services_config.gateway

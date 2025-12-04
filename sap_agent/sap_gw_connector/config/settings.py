@@ -1,4 +1,4 @@
-"""Configuration settings for SAP MCP Server"""
+"""Configuration settings for SAP Gateway Connector"""
 
 import os
 from pathlib import Path
@@ -39,8 +39,8 @@ class SAPConnectionConfig(BaseSettings):
         return v
 
 
-class MCPServerConfig(BaseSettings):
-    """MCP server configuration"""
+class GWServerConfig(BaseSettings):
+    """Gateway server configuration"""
 
     host: str = Field("0.0.0.0", description="Server bind address")
     port: int = Field(8000, description="Server port")
@@ -52,7 +52,7 @@ class MCPServerConfig(BaseSettings):
         None, description="Path to services YAML configuration file"
     )
 
-    model_config = {"env_prefix": "MCP_"}
+    model_config = {"env_prefix": "SAP_GW_"}
 
     @field_validator("log_level")
     @classmethod
@@ -88,7 +88,7 @@ class AppConfig(BaseSettings):
 
     # Core configurations
     sap: SAPConnectionConfig
-    server: MCPServerConfig
+    server: GWServerConfig
     security: SecurityConfig
 
     model_config = {
@@ -114,7 +114,7 @@ class AppConfig(BaseSettings):
 
         return cls(
             sap=sap_config,
-            server=MCPServerConfig(),  # type: ignore[call-arg]
+            server=GWServerConfig(),  # type: ignore[call-arg]
             security=SecurityConfig(),  # type: ignore[call-arg]
         )
 
@@ -155,7 +155,7 @@ def reload_config() -> AppConfig:
 def get_services_config_path() -> Optional[Path]:
     """Get the path to services configuration file from environment or config"""
     # Check environment variable first
-    env_path = os.getenv("MCP_SERVICES_CONFIG_PATH")
+    env_path = os.getenv("SAP_SERVICES_CONFIG_PATH")
     if env_path:
         return Path(env_path)
 

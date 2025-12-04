@@ -18,13 +18,13 @@ from vertexai import agent_engines
 import vertexai
 import sap_agent.agent
 
-# Load SAP credentials from .env.server (for local testing before deploy)
-env_path = Path("sap-mcp-server/.env.server")
+# Load SAP credentials from .env (for local testing before deploy)
+env_path = Path("sap_agent/.env")
 if env_path.exists():
     print(f"Loading environment variables from {env_path}")
     load_dotenv(dotenv_path=env_path)
 else:
-    print(f"Warning: {env_path} not found. Ensure environment variables are set.")
+    print(f"Note: {env_path} not found. Using Secret Manager for credentials.")
 
 # Configuration
 LOCATION = os.getenv("REGION", "us-central1")

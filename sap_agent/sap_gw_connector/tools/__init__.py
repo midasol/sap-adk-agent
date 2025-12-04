@@ -1,8 +1,8 @@
-"""SAP MCP Tools - Modular tool registration"""
+"""SAP Gateway Tools - Modular tool registration"""
 
 import logging
 
-from .base import MCPTool, ToolRegistry, tool_registry
+from .base import SAPTool, ToolRegistry, tool_registry
 from .auth_tool import SAPAuthenticateTool
 from .query_tool import SAPQueryTool
 from .entity_tool import SAPGetEntityTool
@@ -11,7 +11,7 @@ from .service_tool import SAPListServicesTool
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "MCPTool",
+    "SAPTool",
     "ToolRegistry",
     "tool_registry",
     "SAPAuthenticateTool",

@@ -1,4 +1,4 @@
-"""Input validation helpers for SAP MCP Server"""
+"""Input validation helpers for SAP Gateway Connector"""
 
 import re
 from typing import Any, Dict, List, Optional

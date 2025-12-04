@@ -1,10 +1,10 @@
-"""MCP Protocol definitions"""
+"""SAP Gateway Protocol definitions"""
 
 from .schemas import (
-    MCPError,
-    MCPMethodType,
-    MCPRequest,
-    MCPResponse,
+    GWError,
+    GWMethodType,
+    GWRequest,
+    GWResponse,
     ToolCallRequest,
     ToolCallResponse,
     ToolInfo,
@@ -13,10 +13,10 @@ from .schemas import (
 )
 
 __all__ = [
-    "MCPError",
-    "MCPMethodType",
-    "MCPRequest",
-    "MCPResponse",
+    "GWError",
+    "GWMethodType",
+    "GWRequest",
+    "GWResponse",
     "ToolCallRequest",
     "ToolCallResponse",
     "ToolInfo",

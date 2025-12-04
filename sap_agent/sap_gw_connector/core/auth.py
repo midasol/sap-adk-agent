@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Dict, Optional
 
 import aiohttp
 
-from sap_agent.sap_mcp_server.config.settings import SAPConnectionConfig
-from sap_agent.sap_mcp_server.core.exceptions import SAPAuthenticationError, SAPConnectionError
+from sap_agent.sap_gw_connector.config.settings import SAPConnectionConfig
+from sap_agent.sap_gw_connector.core.exceptions import SAPAuthenticationError, SAPConnectionError
 
 if TYPE_CHECKING:
-    from sap_agent.sap_mcp_server.config.schemas import AuthEndpointConfig, ServicesYAMLConfig
+    from sap_agent.sap_gw_connector.config.schemas import AuthEndpointConfig, ServicesYAMLConfig
 
 logger = logging.getLogger(__name__)
 

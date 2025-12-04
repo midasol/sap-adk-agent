@@ -1,7 +1,7 @@
 """SAP Agent with Direct Python Tools for OData Queries.
 
-This agent provides SAP OData integration using direct Python functions
-instead of MCP subprocess, making it compatible with Agent Engine deployment.
+This agent provides SAP OData integration using direct Python functions,
+making it compatible with Agent Engine deployment.
 
 Supports both local development and Agent Engine deployment environments.
 """
@@ -116,7 +116,7 @@ def ensure_sap_config():
         print(f"Debug: After loading - SAP_HOST={os.getenv('SAP_HOST')}")
 
     # Reset cached config to pick up new environment variables
-    from sap_agent.sap_mcp_server.config import settings
+    from sap_agent.sap_gw_connector.config import settings
     settings.config = None
 
     # Verify env vars are set
@@ -128,9 +128,9 @@ def ensure_sap_config():
 
 
 def configure_services_path():
-    """Configure MCP services path for remote environment."""
+    """Configure SAP services path for remote environment."""
     # If explicitly set, respect it
-    if os.getenv("MCP_SERVICES_CONFIG_PATH"):
+    if os.getenv("SAP_SERVICES_CONFIG_PATH"):
         return
 
     # Check for services.yaml in the uploaded agent_config directory
@@ -139,14 +139,14 @@ def configure_services_path():
     services_yaml = root_dir / "agent_config" / "services.yaml"
 
     if services_yaml.exists():
-        os.environ["MCP_SERVICES_CONFIG_PATH"] = str(services_yaml.resolve())
-        print(f"Configured MCP services path: {services_yaml}")
+        os.environ["SAP_SERVICES_CONFIG_PATH"] = str(services_yaml.resolve())
+        print(f"Configured SAP services path: {services_yaml}")
     else:
         # Fallback: check relative to this file (for local dev)
         local_yaml = Path(__file__).parent / "services.yaml"
         if local_yaml.exists():
-             os.environ["MCP_SERVICES_CONFIG_PATH"] = str(local_yaml.resolve())
-             print(f"Configured MCP services path (local): {local_yaml}")
+             os.environ["SAP_SERVICES_CONFIG_PATH"] = str(local_yaml.resolve())
+             print(f"Configured SAP services path (local): {local_yaml}")
         else:
              print(f"Warning: services.yaml not found in {services_yaml} or {local_yaml}")
 
@@ -191,7 +191,7 @@ _sap_client_lock = asyncio.Lock()
 def get_services_config_path() -> Optional[Path]:
     """Get services configuration file path."""
     # Check environment variable first
-    env_path = os.getenv("MCP_SERVICES_CONFIG_PATH")
+    env_path = os.getenv("SAP_SERVICES_CONFIG_PATH")
     if env_path:
         return Path(env_path)
 
@@ -273,7 +273,7 @@ def sap_list_services() -> Dict[str, Any]:
         - source: Configuration source identifier
     """
     try:
-        from sap_agent.sap_mcp_server.config.loader import get_services_config
+        from sap_agent.sap_gw_connector.config.loader import get_services_config
 
         config_path = get_services_config_path()
         services_config = get_services_config(config_path)
@@ -338,9 +338,9 @@ def sap_query(
         # Ensure SAP credentials are loaded from Secret Manager
         ensure_sap_config()
 
-        from sap_agent.sap_mcp_server.config.settings import get_config
-        from sap_agent.sap_mcp_server.config.loader import get_services_config
-        from sap_agent.sap_mcp_server.core.sap_client import SAPClient
+        from sap_agent.sap_gw_connector.config.settings import get_config
+        from sap_agent.sap_gw_connector.config.loader import get_services_config
+        from sap_agent.sap_gw_connector.core.sap_client import SAPClient
 
         # Get SAP connection configuration
         config = get_config(require_sap=True)
@@ -413,9 +413,9 @@ def sap_get_entity(
         # Ensure SAP credentials are loaded from Secret Manager
         ensure_sap_config()
 
-        from sap_agent.sap_mcp_server.config.settings import get_config
-        from sap_agent.sap_mcp_server.config.loader import get_services_config
-        from sap_agent.sap_mcp_server.core.sap_client import SAPClient
+        from sap_agent.sap_gw_connector.config.settings import get_config
+        from sap_agent.sap_gw_connector.config.loader import get_services_config
+        from sap_agent.sap_gw_connector.core.sap_client import SAPClient
 
         config = get_config(require_sap=True)
 

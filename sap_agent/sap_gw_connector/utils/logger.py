@@ -1,4 +1,4 @@
-"""Structured logging configuration for SAP MCP Server"""
+"""Structured logging configuration for SAP Gateway Connector"""
 
 import logging
 import sys
@@ -183,7 +183,7 @@ def get_default_logger() -> FilteringBoundLogger:
         Default logger instance
 
     Example:
-        >>> from sap_agent.sap_mcp_server.utils.logger import get_default_logger
+        >>> from sap_agent.sap_gw_connector.utils.logger import get_default_logger
         >>> logger = get_default_logger()
         >>> logger.info("Application started")
     """

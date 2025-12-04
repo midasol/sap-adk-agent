@@ -1,4 +1,4 @@
-"""Utility modules for SAP MCP Server"""
+"""Utility modules for SAP Gateway Connector"""
 
 from .logger import (
     get_default_logger,

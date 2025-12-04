@@ -1,4 +1,4 @@
-"""MCP Tool base classes and registry"""
+"""SAP Tool base classes and registry"""
 
 import logging
 import time
@@ -6,18 +6,18 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from sap_agent.sap_mcp_server.protocol.schemas import ToolCallRequest, ToolCallResponse, ToolInfo
+from sap_agent.sap_gw_connector.protocol.schemas import ToolCallRequest, ToolCallResponse, ToolInfo
 
 logger = logging.getLogger(__name__)
 
 
-class MCPTool(ABC):
-    """Base class for all MCP tools"""
+class SAPTool(ABC):
+    """Base class for all SAP Gateway tools"""
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """Tool name for MCP registration"""
+        """Tool name for registration"""
         pass
 
     @property
@@ -38,20 +38,20 @@ class MCPTool(ABC):
         pass
 
     def to_tool_info(self) -> ToolInfo:
-        """Convert to MCP ToolInfo schema"""
+        """Convert to ToolInfo schema"""
         return ToolInfo(
             name=self.name, description=self.description, inputSchema=self.input_schema
         )
 
 
 class ToolRegistry:
-    """Registry for managing MCP tools"""
+    """Registry for managing SAP Gateway tools"""
 
     def __init__(self):
-        self._tools: Dict[str, MCPTool] = {}
+        self._tools: Dict[str, SAPTool] = {}
         self._execution_stats: Dict[str, Dict[str, Any]] = {}
 
-    def register(self, tool: MCPTool) -> None:
+    def register(self, tool: SAPTool) -> None:
         """Register a tool"""
         if tool.name in self._tools:
             logger.warning(f"Tool '{tool.name}' already registered, overwriting")
@@ -74,7 +74,7 @@ class ToolRegistry:
             return True
         return False
 
-    def get_tool(self, name: str) -> Optional[MCPTool]:
+    def get_tool(self, name: str) -> Optional[SAPTool]:
         """Get a tool by name"""
         return self._tools.get(name)
 
