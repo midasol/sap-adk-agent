@@ -1,22 +1,22 @@
-# SAP Agent Quick Reference Guide
+# SAP Agent 빠른 참조 가이드
 
-## Complete Setup Flow
+## 전체 설정 흐름
 
 ```bash
-# 1. GCP base resource setup (API, service account, IAM)
+# 1. GCP 기본 리소스 설정 (API, 서비스 계정, IAM)
 ./scripts/setup_gcp_prerequisites.sh
 
-# 2. PSC network infrastructure setup
+# 2. PSC 네트워크 인프라 설정
 ./scripts/setup_psc_infrastructure.sh
 
-# 3. Agent deployment
+# 3. Agent 배포
 python scripts/deploy_agent_engine.py
 
-# 4. Verify deployment
+# 4. 배포 확인
 gcloud ai reasoning-engines list --region=us-central1
 ```
 
-## GCP API Enablement
+## GCP API 활성화
 
 ```bash
 gcloud services enable \
@@ -29,22 +29,22 @@ gcloud services enable \
     dns.googleapis.com
 ```
 
-## Service Account Creation
+## 서비스 계정 생성
 
 ```bash
-# Agent Engine service account
+# Agent Engine 서비스 계정
 gcloud iam service-accounts create agent-engine-sa \
     --display-name="SAP Agent Engine Service Account"
 ```
 
-## IAM Role Assignment
+## IAM 역할 부여
 
 ```bash
 PROJECT_ID="your-project-id"
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
 SA_EMAIL="agent-engine-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
-# Agent Engine SA roles
+# Agent Engine SA 역할
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SA_EMAIL" \
     --role="roles/aiplatform.user"
@@ -57,7 +57,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SA_EMAIL" \
     --role="roles/serviceusage.serviceUsageConsumer"
 
-# GCP service agent roles
+# GCP 서비스 에이전트 역할
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
     --role="roles/compute.networkAdmin"
@@ -67,36 +67,36 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --role="roles/serviceusage.serviceUsageConsumer"
 ```
 
-## Deployment Commands
+## 배포 명령어
 
 ```bash
-# Run deployment
+# 배포 실행
 python scripts/deploy_agent_engine.py
 
-# Verify deployment
+# 배포 확인
 gcloud ai reasoning-engines list --region=us-central1
 ```
 
-## Key Configuration
+## 핵심 설정
 
-| Item | Value |
-|------|-------|
-| SAP Host (Internal) | `10.142.0.5` |
+| 항목 | 값 |
+|------|-----|
+| SAP Host (내부) | `10.142.0.5` |
 | SAP Port | `44300` |
 | Model | `gemini-2.5-pro` |
 | Region | `us-central1` |
 
-## Common Issue Resolution Summary
+## 주요 이슈 해결 요약
 
-| Issue | Solution |
-|-------|----------|
-| Gateway subprocess not available | Switched to Direct Python functions |
-| serviceUsageConsumer permission | Grant role to service account |
-| Secret Manager import error | Lazy loading pattern applied |
-| Event loop conflict | Added `nest_asyncio` |
-| SAP connection timeout | Changed to internal IP |
+| 이슈 | 해결 |
+|------|------|
+| Gateway subprocess 불가 | Direct Python 함수로 전환 |
+| serviceUsageConsumer 권한 | 서비스 계정에 역할 부여 |
+| Secret Manager import 오류 | Lazy loading 패턴 적용 |
+| Event loop 충돌 | `nest_asyncio` 추가 |
+| SAP 연결 타임아웃 | 내부 IP로 변경 |
 
-## Secret Manager Update
+## Secret Manager 업데이트
 
 ```bash
 echo '{
@@ -108,10 +108,10 @@ echo '{
 }' | gcloud secrets versions add sap-credentials --data-file=-
 ```
 
-## PSC Infrastructure Setup
+## PSC 인프라 설정
 
 ```bash
-# Customizable via environment variables
+# 환경 변수로 커스터마이징 가능
 export PROJECT_ID="your-project-id"
 export VPC_NAME="your-vpc-network"
 export SAP_IP="10.x.x.x"
@@ -119,44 +119,44 @@ export SAP_IP="10.x.x.x"
 ./scripts/setup_psc_infrastructure.sh
 ```
 
-## Agent Testing
+## Agent 테스트
 
 ```python
 from vertexai import agent_engines
 
 agent = agent_engines.get("projects/110191959938/locations/us-central1/reasoningEngines/5675639440161112064")
 session = agent.create_session()
-response = session.send_message("Show me the SAP service list")
+response = session.send_message("SAP 서비스 목록 보여줘")
 ```
 
-## File Structure
+## 파일 구조
 
 ```mermaid
 flowchart LR
-    subgraph Root["agent-adk-sap-gw/"]
-        subgraph SapAgent["sap_agent/"]
-            AgentPy["agent.py"]
-            ServicesYaml["services.yaml"]
+    subgraph Root["📁 agent-adk-sap-gw/"]
+        subgraph SapAgent["📁 sap_agent/"]
+            AgentPy["🤖 agent.py"]
+            ServicesYaml["⚙️ services.yaml"]
 
-            subgraph GWConnector["sap_gw_connector/"]
-                subgraph Config["config/"]
+            subgraph GWConnector["📁 sap_gw_connector/"]
+                subgraph Config["📁 config/"]
                     Settings["settings.py"]
                     Loader["loader.py"]
                     Schemas["schemas.py"]
                 end
-                subgraph Core["core/"]
+                subgraph Core["📁 core/"]
                     SAPClient["sap_client.py"]
                 end
             end
         end
 
-        subgraph Scripts["scripts/"]
+        subgraph Scripts["📁 scripts/"]
             GCPSetup["setup_gcp_prerequisites.sh"]
             PSCSetup["setup_psc_infrastructure.sh"]
             Deploy["deploy_agent_engine.py"]
         end
 
-        subgraph Docs["docs/"]
+        subgraph Docs["📁 docs/"]
             Guide["DEPLOYMENT_GUIDE.md"]
             Quick["QUICK_REFERENCE.md"]
         end
@@ -168,18 +168,12 @@ flowchart LR
     style Docs fill:#fce4ec,stroke:#c2185b
 ```
 
-## Debugging Tips
+## 디버깅 팁
 
 ```bash
-# Check Agent Engine logs
+# Agent Engine 로그 확인
 gcloud logging read "resource.type=aiplatform.googleapis.com/ReasoningEngine" --limit=50
 
-# Verify secret value
+# Secret 값 확인
 gcloud secrets versions access latest --secret=sap-credentials
 ```
-
----
-
-## Documentation
-
-- [Korean Documentation (한국어 문서)](KR/QUICK_REFERENCE.md)
