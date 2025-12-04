@@ -484,7 +484,9 @@ flowchart LR
             end
         end
 
-        subgraph Scripts["📁 scripts/ - 배포 스크립트"]
+        subgraph Scripts["📁 scripts/ - 설정 및 배포 스크립트"]
+            GCPSetup["🔧 setup_gcp_prerequisites.sh"]
+            PSCSetup["🌐 setup_psc_infrastructure.sh"]
             DeployPy["🚀 deploy_agent_engine.py"]
             TestPy["🧪 test_*.py"]
             CleanupPy["🧹 cleanup_agent_engines.py"]
@@ -515,7 +517,7 @@ flowchart LR
 | `sap_agent/sap_gw_connector/core/` | SAP HTTP 클라이언트 및 인증 |
 | `sap_agent/sap_gw_connector/tools/` | SAP 도구 클래스 (Query, Entity, Service) |
 | `sap_agent/sap_gw_connector/utils/` | 로깅 및 유틸리티 |
-| `scripts/` | 배포 및 테스트 스크립트 |
+| `scripts/` | GCP 설정, PSC 인프라, 배포 스크립트 |
 | `docs/` | 배포 가이드 및 참조 문서 |
 
 ### 주요 파일 설명
@@ -526,6 +528,8 @@ flowchart LR
 | `sap_agent/services.yaml` | SAP OData 서비스 및 엔티티 설정 |
 | `sap_agent/sap_gw_connector/core/sap_client.py` | aiohttp 기반 비동기 SAP HTTP 클라이언트 |
 | `sap_agent/sap_gw_connector/core/auth.py` | CSRF 토큰 기반 SAP 인증 처리 |
+| `scripts/setup_gcp_prerequisites.sh` | GCP API, 서비스 계정, IAM 설정 스크립트 |
+| `scripts/setup_psc_infrastructure.sh` | PSC 네트워크 인프라 설정 스크립트 |
 | `sap_agent/sap_gw_connector/config/settings.py` | Pydantic 기반 환경 설정 관리 |
 | `scripts/deploy_agent_engine.py` | Vertex AI Agent Engine 배포 스크립트 |
 
@@ -536,9 +540,9 @@ flowchart LR
 ### 요구사항
 
 - Python 3.11 이상
-- Google Cloud SDK
+- Google Cloud SDK (gcloud CLI)
 - SAP Gateway 접근 권한
-- GCP 프로젝트 (Vertex AI, Secret Manager 활성화)
+- GCP 프로젝트 (Owner 또는 Editor 권한)
 
 ### 설치
 
@@ -555,11 +559,140 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-### 환경 설정
+---
 
-#### 1. SAP 자격증명 설정
+## GCP 사전 설정
 
-로컬 개발용 `.env` 파일 생성:
+### 자동 설정 (권장)
+
+스크립트를 사용하여 모든 GCP 리소스를 자동으로 설정합니다:
+
+```bash
+# 1. GCP 기본 리소스 설정 (API, 서비스 계정, IAM)
+./scripts/setup_gcp_prerequisites.sh
+
+# 2. PSC 네트워크 인프라 설정
+./scripts/setup_psc_infrastructure.sh
+
+# 3. Agent 배포
+python scripts/deploy_agent_engine.py
+```
+
+### 수동 설정
+
+#### Step 1: API 활성화
+
+```bash
+# 프로젝트 설정
+export PROJECT_ID="your-project-id"
+gcloud config set project $PROJECT_ID
+
+# 필수 API 활성화
+gcloud services enable \
+    compute.googleapis.com \
+    aiplatform.googleapis.com \
+    secretmanager.googleapis.com \
+    cloudbuild.googleapis.com \
+    storage.googleapis.com \
+    iam.googleapis.com \
+    iamcredentials.googleapis.com \
+    dns.googleapis.com \
+    servicenetworking.googleapis.com
+```
+
+#### Step 2: 서비스 계정 생성
+
+```bash
+# Agent Engine용 서비스 계정 생성
+gcloud iam service-accounts create agent-engine-sa \
+    --display-name="SAP Agent Engine Service Account" \
+    --description="Service account for SAP Agent deployed on Vertex AI Agent Engine"
+```
+
+#### Step 3: IAM 권한 설정
+
+```bash
+PROJECT_ID="your-project-id"
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+
+# Agent Engine 서비스 계정에 역할 부여
+SA_EMAIL="agent-engine-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/aiplatform.user"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/secretmanager.secretAccessor"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/storage.objectViewer"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/logging.logWriter"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/serviceusage.serviceUsageConsumer"
+
+# GCP 관리형 서비스 에이전트에 권한 부여
+for SA in \
+    "service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
+    "service-${PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com" \
+    "service-${PROJECT_NUMBER}@gcp-sa-aiplatform-cc.iam.gserviceaccount.com"
+do
+    gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$SA" \
+        --role="roles/serviceusage.serviceUsageConsumer"
+done
+
+# PSC용 Network Admin 권한
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
+    --role="roles/compute.networkAdmin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
+    --role="roles/dns.peer"
+```
+
+### 필수 API 목록
+
+| API | 용도 |
+|-----|------|
+| `compute.googleapis.com` | VPC, PSC 네트워크 관리 |
+| `aiplatform.googleapis.com` | Vertex AI Agent Engine |
+| `secretmanager.googleapis.com` | SAP 자격증명 저장 |
+| `cloudbuild.googleapis.com` | Agent 패키징 및 배포 |
+| `storage.googleapis.com` | Staging 버킷 |
+| `iam.googleapis.com` | IAM 관리 |
+| `dns.googleapis.com` | PSC DNS 설정 |
+| `servicenetworking.googleapis.com` | 서비스 네트워킹 |
+
+### 서비스 계정 및 IAM 역할
+
+| 서비스 계정 | 역할 | 용도 |
+|------------|------|------|
+| `agent-engine-sa` | `roles/aiplatform.user` | Vertex AI 사용 |
+| `agent-engine-sa` | `roles/secretmanager.secretAccessor` | Secret Manager 접근 |
+| `agent-engine-sa` | `roles/storage.objectViewer` | Staging 버킷 읽기 |
+| `agent-engine-sa` | `roles/logging.logWriter` | Cloud Logging 쓰기 |
+| `agent-engine-sa` | `roles/serviceusage.serviceUsageConsumer` | 프로젝트 서비스 사용 |
+| `gcp-sa-aiplatform` | `roles/compute.networkAdmin` | PSC 네트워크 관리 |
+| `gcp-sa-aiplatform` | `roles/dns.peer` | PSC DNS 피어링 |
+| `gcp-sa-aiplatform-re` | `roles/serviceusage.serviceUsageConsumer` | Reasoning Engine 서비스 |
+| `gcp-sa-aiplatform-cc` | `roles/serviceusage.serviceUsageConsumer` | Code Container 서비스 |
+
+---
+
+## 환경 설정
+
+### 로컬 개발 환경
+
+SAP 자격증명용 `.env` 파일 생성:
 
 ```bash
 # sap_agent/.env
@@ -570,7 +703,7 @@ SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
 ```
 
-#### 2. Google Cloud 인증
+### Google Cloud 인증
 
 ```bash
 # GCP 인증
@@ -580,7 +713,7 @@ gcloud auth application-default login
 gcloud config set project YOUR_PROJECT_ID
 ```
 
-#### 3. Secret Manager 설정 (배포용)
+### Secret Manager 설정 (배포용)
 
 ```bash
 # Secret 생성
