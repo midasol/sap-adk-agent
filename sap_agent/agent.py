@@ -174,7 +174,7 @@ def get_model_name() -> str:
 
     Can be overridden via SAP_AGENT_MODEL environment variable.
     """
-    return os.getenv("SAP_AGENT_MODEL", "gemini-2.5-pro")
+    return os.getenv("SAP_AGENT_MODEL", "gemini-3-pro-preview")
 
 
 MODEL_NAME = get_model_name()

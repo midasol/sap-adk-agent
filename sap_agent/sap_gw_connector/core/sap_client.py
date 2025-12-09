@@ -284,6 +284,7 @@ class SAPClient:
         select_fields: Optional[List[str]] = None,
         top: Optional[int] = None,
         skip: Optional[int] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """Query an OData entity set"""
 
