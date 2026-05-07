@@ -1,0 +1,979 @@
+# SAP Agent with Google ADK
+
+An AI Agent integrated with SAP Gateway OData services, enabling natural language queries and analysis of SAP data.
+
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![Google ADK](https://img.shields.io/badge/Google%20ADK-1.15+-green.svg)](https://cloud.google.com/vertex-ai/docs/reasoning-engine/overview)
+[![Vertex AI](https://img.shields.io/badge/Vertex%20AI-Agent%20Engine-orange.svg)](https://cloud.google.com/vertex-ai)
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Usage](#usage)
+- [Deployment](#deployment)
+- [Known Issues and Limitations](#known-issues-and-limitations)
+- [Development Guide](#development-guide)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Overview
+
+### Project Purpose
+
+Deploy an AI Agent integrated with SAP OData services to Google Cloud's Vertex AI Agent Engine, providing a system to query and analyze SAP data using natural language.
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| `sap_list_services` | List available SAP OData services |
+| `sap_query` | Execute filtered queries on SAP entity sets |
+| `sap_get_entity` | Retrieve a single entity by specific key |
+
+### Technology Stack
+
+| Component | Technology |
+|-----------|------------|
+| AI Framework | Google ADK (Agent Development Kit) |
+| LLM Model | Gemini 3 Pro Preview (configurable via `SAP_AGENT_MODEL` env var) |
+| Deployment Platform | Vertex AI Agent Engine |
+| SAP Integration | OData v2 Protocol |
+| Credential Management | Google Secret Manager |
+| Network | Private Service Connect (PSC) |
+| HTTP Client | aiohttp (async) |
+| Configuration | Pydantic Settings |
+
+---
+
+## Architecture
+
+### Architecture Overview
+
+This project is designed based on a **3-Tier Architecture**:
+
+```mermaid
+flowchart TB
+    subgraph PresentationLayer["PRESENTATION LAYER"]
+        subgraph AgentEngine["Vertex AI Agent Engine"]
+            Gemini["Gemini 3 Pro + Google ADK"]
+            NLU["Natural Language Understanding & Intent Parsing"]
+            Orchestration["Tool Selection & Orchestration"]
+            Response["Response Generation & Formatting"]
+        end
+    end
+
+    subgraph ApplicationLayer["APPLICATION LAYER"]
+        subgraph GWConnector["SAP Gateway Connector (sap_gw_connector)"]
+            subgraph ConfigMod["config/"]
+                Settings["settings"]
+                Schemas["schemas"]
+                Loader["loader"]
+            end
+            subgraph CoreMod["core/"]
+                SAPClient["sap_client"]
+                Auth["auth"]
+                Exceptions["exceptions"]
+            end
+            subgraph ToolsMod["tools/"]
+                QueryTool["query_tool"]
+                EntityTool["entity_tool"]
+                ServiceTool["service_tool"]
+            end
+            subgraph UtilsMod["utils/"]
+                Logger["logger"]
+                Validators["validators"]
+            end
+        end
+    end
+
+    subgraph DataLayer["DATA LAYER"]
+        subgraph SAPGateway["SAP Gateway (OData v2)"]
+            SalesOrder["Sales Order Service"]
+            Customer["Customer Service"]
+            Material["Material Service"]
+            Flight["Flight Booking Service"]
+        end
+    end
+
+    PresentationLayer -->|"Tool Calls"| ApplicationLayer
+    ApplicationLayer -->|"OData HTTP/S"| DataLayer
+
+    style PresentationLayer fill:#e3f2fd,stroke:#1976d2
+    style ApplicationLayer fill:#e8f5e9,stroke:#388e3c
+    style DataLayer fill:#fff3e0,stroke:#f57c00
+```
+
+### Core Design Principles
+
+| Principle | Description |
+|-----------|-------------|
+| **Separation of Concerns** | Responsibility separation between Agent, Connector, and SAP layers |
+| **Async-First** | Performance optimization with aiohttp-based async HTTP client |
+| **Configuration-Driven** | YAML-based service configuration for extension without code changes |
+| **Security Infrastructure** | CSRF token, Secret Manager, and PSC integration; some defaults require hardening for production (e.g., `verify_ssl` defaults to `False`) |
+| **Lazy Loading** | Lazy loading pattern to prevent runtime permission issues |
+
+---
+
+### System Architecture
+
+```mermaid
+flowchart TB
+    subgraph User["User"]
+        U["User"]
+    end
+
+    subgraph GCP["Google Cloud Platform"]
+        subgraph AE["Vertex AI Agent Engine"]
+            Agent["SAP Agent<br/>(Google ADK + Gemini)"]
+            subgraph Tools["Agent Tools"]
+                ListSvc["sap_list_services"]
+                Query["sap_query"]
+                GetEntity["sap_get_entity"]
+            end
+        end
+
+        SM["Secret Manager<br/>(SAP Credentials)"]
+        PSC["Private Service Connect"]
+    end
+
+    subgraph SAP["SAP System"]
+        GW["SAP Gateway"]
+        subgraph OData["OData Services"]
+            SO["Sales Order"]
+            CU["Customer"]
+            MA["Material"]
+            FL["Flight"]
+        end
+    end
+
+    U -->|"Natural Language Query"| Agent
+    Agent --> Tools
+    Agent -.->|"env_vars"| SM
+    Tools -->|"HTTP/OData"| PSC
+    PSC -->|"Private Network"| GW
+    GW --> OData
+    Agent -->|"Natural Language Response"| U
+```
+
+---
+
+### Deployment Architecture
+
+```mermaid
+flowchart TB
+    subgraph Internet["Internet"]
+        Client["Client Application"]
+    end
+
+    subgraph GCP["Google Cloud Platform (us-central1)"]
+        subgraph VPC["VPC Network"]
+            subgraph AgentEngine["Vertex AI Agent Engine"]
+                AE["SAP Agent<br/>ReasoningEngine ID: 5675639440161112064"]
+            end
+
+            subgraph PSCZone["Private Service Connect Zone"]
+                NA["Network Attachment<br/>agent-engine-attachment"]
+            end
+        end
+
+        subgraph IAM["IAM & Security"]
+            SA["Service Account<br/>agent-engine-sa@..."]
+            SM["Secret Manager<br/>sap-credentials"]
+        end
+
+        subgraph Storage["Cloud Storage"]
+            SB["Staging Bucket<br/>gs://..._cloudbuild"]
+        end
+    end
+
+    subgraph OnPrem["On-Premises / Private Network"]
+        subgraph SAPZone["SAP Zone (YOUR_SAP_SUBNET_RANGE)"]
+            SAPGW["SAP Gateway<br/>YOUR_SAP_HOST_INTERNAL:44300"]
+        end
+    end
+
+    Client -->|"HTTPS"| AE
+    AE -->|"reads"| SM
+    AE -->|"uses"| SA
+    AE -->|"packages from"| SB
+    AE -->|"connects via"| NA
+    NA -->|"Private Network<br/>TCP 44300"| SAPGW
+
+    style AE fill:#4285f4,color:#fff
+    style SAPGW fill:#f4b400,color:#000
+    style SM fill:#34a853,color:#fff
+    style NA fill:#ea4335,color:#fff
+```
+
+---
+
+### Module Architecture
+
+```mermaid
+flowchart TB
+    subgraph AgentLayer["Agent Layer (sap_agent/)"]
+        Agent["agent.py<br/>Root Agent Definition"]
+        ServicesYAML["services.yaml<br/>Service Configuration"]
+    end
+
+    subgraph ConnectorLayer["Gateway Connector Layer (sap_gw_connector/)"]
+        subgraph ConfigModule["config/"]
+            Settings["settings.py<br/>Pydantic Settings"]
+            Schemas["schemas.py<br/>YAML Schemas"]
+            Loader["loader.py<br/>Config Loader"]
+        end
+
+        subgraph CoreModule["core/"]
+            SAPClient["sap_client.py<br/>HTTP Client"]
+            Auth["auth.py<br/>CSRF Auth"]
+            Exceptions["exceptions.py<br/>Error Types"]
+        end
+
+        subgraph ToolsModule["tools/"]
+            BaseTool["base.py<br/>SAPTool Base"]
+            QueryTool["query_tool.py<br/>Query Operations"]
+            EntityTool["entity_tool.py<br/>Entity Operations"]
+            ServiceTool["service_tool.py<br/>Service Discovery"]
+        end
+
+        subgraph UtilsModule["utils/"]
+            Logger["logger.py<br/>Structured Logging"]
+            Validators["validators.py<br/>Input Validation"]
+        end
+    end
+
+    subgraph ModelLayer["Model Layer"]
+        GlobalGemini["GlobalGemini<br/>Forces global endpoint<br/>for Gemini 3 models"]
+    end
+
+    Agent -->|"uses"| GlobalGemini
+    Agent -->|"imports"| SAPClient
+    Agent -->|"loads"| ServicesYAML
+    ServicesYAML -->|"parsed by"| Loader
+    Loader -->|"validates with"| Schemas
+    SAPClient -->|"configured by"| Settings
+    SAPClient -->|"authenticates via"| Auth
+    SAPClient -->|"raises"| Exceptions
+    QueryTool -->|"extends"| BaseTool
+    EntityTool -->|"extends"| BaseTool
+    ServiceTool -->|"extends"| BaseTool
+    BaseTool -->|"uses"| SAPClient
+
+    style Agent fill:#4285f4,color:#fff
+    style SAPClient fill:#34a853,color:#fff
+    style Auth fill:#ea4335,color:#fff
+```
+
+---
+
+### Security Architecture
+
+```mermaid
+flowchart LR
+    subgraph SecurityLayers["Security Layers"]
+        direction TB
+
+        subgraph L1["Layer 1: Network Security"]
+            PSC["Private Service Connect<br/>Internal Network Isolation"]
+            FW["Firewall Rules<br/>Port 44300 Only"]
+        end
+
+        subgraph L2["Layer 2: Authentication/Authorization"]
+            SM["Secret Manager<br/>Encrypted Credential Storage"]
+            SA["Service Account<br/>Principle of Least Privilege"]
+            CSRF["CSRF Token<br/>Per-Request Token Verification"]
+        end
+
+        subgraph L3["Layer 3: Transport Security"]
+            TLS["TLS/SSL<br/>HTTPS Encryption"]
+            CERT["Certificate Validation<br/>(Dev: verify_ssl=false)"]
+        end
+
+        subgraph L4["Layer 4: Runtime Security"]
+            LAZY["Lazy Loading<br/>Delayed Permission Timing"]
+            ENV["Environment Variables<br/>Runtime Injection"]
+        end
+    end
+
+    L1 --> L2 --> L3 --> L4
+
+    style PSC fill:#ea4335,color:#fff
+    style SM fill:#34a853,color:#fff
+    style TLS fill:#4285f4,color:#fff
+    style LAZY fill:#f4b400,color:#000
+```
+
+#### Security Components
+
+| Component | Description | Implementation Location |
+|-----------|-------------|------------------------|
+| **Secret Manager** | Encrypted storage of SAP credentials | `agent.py:load_secrets_from_manager()` |
+| **CSRF Token** | SAP request integrity verification | `core/auth.py:SAPAuthenticator` |
+| **Private Service Connect** | VPC internal network communication | Deployment config `psc_interface_config` |
+| **Service Account** | Minimum privilege IAM roles | `agent-engine-sa@...` |
+| **Lazy Loading** | Prevent import-time permission issues | `agent.py:_get_secret_manager()` |
+
+### Component Diagram
+
+```mermaid
+classDiagram
+    class Agent {
+        +MODEL_NAME: str
+        +MODEL: GlobalGemini
+        +root_agent: Agent
+        +sap_list_services() Dict
+        +sap_query() Dict
+        +sap_get_entity() Dict
+        +ensure_sap_config()
+        +load_secrets_from_manager()
+        +get_model() GlobalGemini
+        +get_model_name() str
+    }
+
+    class GlobalGemini {
+        <<Gemini subclass>>
+        +api_client: Client
+        Note: Forces global endpoint for Gemini 3
+        Note: Required because Agent Engine
+        Note: overrides GOOGLE_CLOUD_LOCATION
+    }
+
+    Agent --> GlobalGemini : uses
+
+    class SAPClient {
+        -config: SAPConnectionConfig
+        -session: aiohttp.ClientSession
+        -authenticator: SAPAuthenticator
+        +authenticate() bool
+        +query_entity_set() Dict
+        +get_entity() Dict
+        +create_entity() Dict
+        +update_entity() Dict
+        +delete_entity() bool
+    }
+
+    class SAPAuthenticator {
+        -config: SAPConnectionConfig
+        -current_token: AuthToken
+        +get_valid_token() AuthToken
+        +invalidate_token()
+        +get_auth_headers() Dict
+    }
+
+    class AuthToken {
+        +csrf_token: str
+        +cookies: Dict
+        +expires_at: datetime
+        +is_expired: bool
+        +is_valid: bool
+    }
+
+    class SAPConnectionConfig {
+        +host: str
+        +port: int
+        +client: str
+        +username: str
+        +password: str
+        +verify_ssl: bool
+        +timeout: int
+    }
+
+    class ServicesYAMLConfig {
+        +gateway: GatewayConfig
+        +services: List~ServiceConfig~
+        +get_service() ServiceConfig
+        +list_service_ids() List
+    }
+
+    Agent --> SAPClient : uses
+    SAPClient --> SAPAuthenticator : authenticates via
+    SAPAuthenticator --> AuthToken : manages
+    SAPClient --> SAPConnectionConfig : configured by
+    Agent --> ServicesYAMLConfig : loads
+```
+
+### SAP Query Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Agent (Gemini)
+    participant T as sap_query Tool
+    participant C as SAPClient
+    participant Auth as Authenticator
+    participant SAP as SAP Gateway
+
+    U->>A: "Show me the sales order list"
+    A->>A: Intent Parsing & Tool Selection
+    A->>T: sap_query(service="Z_SALES_ORDER_GENAI_SRV", entity_set="zsd004Set")
+    T->>T: ensure_sap_config()
+    T->>C: query_entity_set()
+
+    rect rgb(200, 220, 240)
+        Note over C,SAP: Authentication Flow
+        C->>Auth: get_valid_token()
+        Auth->>SAP: GET /sap/opu/odata/... (X-CSRF-Token: Fetch)
+        SAP-->>Auth: 200 OK + CSRF Token + Cookies
+        Auth-->>C: AuthToken
+    end
+
+    rect rgb(220, 240, 200)
+        Note over C,SAP: Data Query Flow
+        C->>SAP: GET /sap/opu/odata/SAP/Z_SALES_ORDER_GENAI_SRV/zsd004Set?$format=json
+        SAP-->>C: 200 OK + JSON Response
+    end
+
+    C-->>T: {"results": [...], "count": N}
+    T-->>A: Formatted Results
+    A-->>U: "There are 15 sales orders:\n1. 91000092 - $1,500,000\n2. ..."
+```
+
+### Data Flow
+
+```mermaid
+flowchart LR
+    subgraph Input["Input"]
+        NL["Natural Language Query<br/>'Show me sales order list'"]
+    end
+
+    subgraph Processing["Processing"]
+        direction TB
+        Agent["Agent<br/>(Gemini 3 Pro)"]
+        Tool["Tool Selection<br/>sap_query"]
+        Auth["Authentication<br/>CSRF Token"]
+        OData["OData Request<br/>HTTP GET"]
+    end
+
+    subgraph Transform["Transform"]
+        JSON["JSON Response<br/>{results: [...]}"]
+        Clean["Response Transform<br/>Compact Format"]
+    end
+
+    subgraph Output["Output"]
+        NLR["Natural Language Response<br/>'15 sales orders...'"]
+    end
+
+    NL --> Agent --> Tool --> Auth --> OData --> JSON --> Clean --> NLR
+```
+
+---
+
+## Project Structure
+
+```mermaid
+flowchart LR
+    subgraph Root["agent-adk-sap-gw/"]
+        direction TB
+
+        subgraph SapAgent["sap_agent/ - Main Agent Package"]
+            AgentPy["agent.py<br/>Google ADK Agent"]
+            ServicesYaml["services.yaml<br/>OData Service Config"]
+
+            subgraph GWConnector["sap_gw_connector/ - SAP Gateway Communication"]
+                subgraph Config["config/"]
+                    SettingsPy["settings.py"]
+                    SchemasPy["schemas.py"]
+                    LoaderPy["loader.py"]
+                end
+
+                subgraph Core["core/"]
+                    SAPClientPy["sap_client.py"]
+                    AuthPy["auth.py"]
+                    ExceptionsPy["exceptions.py"]
+                end
+
+                subgraph Tools["tools/ (unused in Agent Engine)"]
+                    BasePy["base.py"]
+                    QueryToolPy["query_tool.py"]
+                    EntityToolPy["entity_tool.py"]
+                    ServiceToolPy["service_tool.py"]
+                    AuthToolPy["auth_tool.py"]
+                end
+
+                subgraph Protocol["protocol/ (unused in Agent Engine)"]
+                    ProtoSchemas["schemas.py"]
+                end
+
+                subgraph Transports["transports/ (unused in Agent Engine)"]
+                    StdioPy["stdio.py"]
+                end
+
+                subgraph Utils["utils/"]
+                    LoggerPy["logger.py"]
+                    ValidatorsPy["validators.py"]
+                end
+            end
+        end
+
+        subgraph Scripts["scripts/ - Setup and Deployment Scripts"]
+            GCPSetup["setup_gcp_prerequisites.sh"]
+            PSCSetup["setup_psc_infrastructure.sh"]
+            DeployPy["deploy_agent_engine.py"]
+            TestPy["test_*.py"]
+            CleanupPy["cleanup_agent_engines.py"]
+        end
+
+        subgraph Docs["docs/ - Documentation"]
+            DeployGuide["DEPLOYMENT_GUIDE.md"]
+            QuickRef["QUICK_REFERENCE.md"]
+        end
+
+        PyProject["pyproject.toml"]
+        Readme["README.md"]
+    end
+
+    style SapAgent fill:#e3f2fd,stroke:#1976d2
+    style GWConnector fill:#e8f5e9,stroke:#388e3c
+    style Scripts fill:#fff3e0,stroke:#f57c00
+    style Docs fill:#fce4ec,stroke:#c2185b
+```
+
+### Directory Structure Details
+
+| Directory | Description |
+|-----------|-------------|
+| `sap_agent/` | Main agent package (Google ADK Agent definition) |
+| `sap_agent/sap_gw_connector/` | SAP Gateway communication module |
+| `sap_agent/sap_gw_connector/config/` | Pydantic settings and YAML schemas |
+| `sap_agent/sap_gw_connector/core/` | SAP HTTP client and authentication |
+| `sap_agent/sap_gw_connector/tools/` | SAP tool classes (Query, Entity, Service, Auth) — unused in Agent Engine |
+| `sap_agent/sap_gw_connector/protocol/` | MCP protocol schemas — unused in Agent Engine |
+| `sap_agent/sap_gw_connector/transports/` | MCP stdio transport — unused in Agent Engine |
+| `sap_agent/sap_gw_connector/utils/` | Logging and input validation utilities |
+| `scripts/` | GCP setup, PSC infrastructure, deployment scripts |
+| `docs/` | Deployment guide and reference documentation |
+
+### Key File Descriptions
+
+| File | Description |
+|------|-------------|
+| `sap_agent/agent.py` | Google ADK Agent definition with 3 SAP tool functions, `GlobalGemini` model class, and Secret Manager integration |
+| `sap_agent/services.yaml` | SAP OData service and entity configuration |
+| `sap_agent/sap_gw_connector/core/sap_client.py` | aiohttp-based async SAP HTTP client |
+| `sap_agent/sap_gw_connector/core/auth.py` | CSRF token-based SAP authentication |
+| `sap_agent/sap_gw_connector/tools/auth_tool.py` | Auth tool class (unused in Agent Engine deployment) |
+| `sap_agent/sap_gw_connector/protocol/schemas.py` | MCP protocol schemas (unused in Agent Engine deployment) |
+| `sap_agent/sap_gw_connector/transports/stdio.py` | MCP stdio transport (unused in Agent Engine deployment) |
+| `scripts/setup_gcp_prerequisites.sh` | GCP API, service account, IAM setup script |
+| `scripts/setup_psc_infrastructure.sh` | PSC network infrastructure setup script |
+| `sap_agent/sap_gw_connector/config/settings.py` | Pydantic-based environment configuration |
+| `scripts/deploy_agent_engine.py` | Vertex AI Agent Engine deployment script |
+
+---
+
+## Getting Started
+
+### Requirements
+
+- Python 3.11 or higher
+- Google Cloud SDK (gcloud CLI)
+- SAP Gateway access credentials
+- GCP Project (Owner or Editor permissions)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd agent-adk-sap-gw
+
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies (using uv, recommended)
+uv sync --group dev
+
+# Or using pip (note: dev dependencies use PEP 735 dependency-groups)
+pip install -e .
+```
+
+---
+
+## GCP Prerequisites
+
+### Automated Setup (Recommended)
+
+Use scripts to automatically configure all GCP resources:
+
+```bash
+# 1. GCP base resource setup (API, service account, IAM)
+./scripts/setup_gcp_prerequisites.sh
+
+# 2. PSC network infrastructure setup
+./scripts/setup_psc_infrastructure.sh
+
+# 3. Agent deployment
+python scripts/deploy_agent_engine.py
+```
+
+### Manual Setup
+
+> **Important**: Replace all placeholder values (e.g., `your-project-id`, IP addresses) with your actual GCP project and environment settings.
+
+#### Step 1: Enable APIs
+
+```bash
+# Set project
+export PROJECT_ID="[your-project-id]"
+gcloud config set project $PROJECT_ID
+
+# Enable required APIs
+gcloud services enable \
+    compute.googleapis.com \
+    aiplatform.googleapis.com \
+    secretmanager.googleapis.com \
+    cloudbuild.googleapis.com \
+    storage.googleapis.com \
+    iam.googleapis.com \
+    iamcredentials.googleapis.com \
+    dns.googleapis.com \
+    servicenetworking.googleapis.com
+```
+
+#### Step 2: Create Service Account
+
+```bash
+# Create Agent Engine service account
+gcloud iam service-accounts create agent-engine-sa \
+    --display-name="SAP Agent Engine Service Account" \
+    --description="Service account for SAP Agent deployed on Vertex AI Agent Engine"
+```
+
+#### Step 3: Configure IAM Permissions
+
+```bash
+# ⚠️ Replace with your actual GCP project ID
+PROJECT_ID="[your-project-id]"
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+
+# Grant roles to Agent Engine service account
+SA_EMAIL="agent-engine-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/aiplatform.user"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/secretmanager.secretAccessor"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/storage.objectViewer"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/logging.logWriter"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/serviceusage.serviceUsageConsumer"
+
+# Grant permissions to GCP managed service agents
+for SA in \
+    "service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
+    "service-${PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com" \
+    "service-${PROJECT_NUMBER}@gcp-sa-aiplatform-cc.iam.gserviceaccount.com"
+do
+    gcloud projects add-iam-policy-binding $PROJECT_ID \
+        --member="serviceAccount:$SA" \
+        --role="roles/serviceusage.serviceUsageConsumer"
+done
+
+# Network Admin permissions for PSC
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
+    --role="roles/compute.networkAdmin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-aiplatform.iam.gserviceaccount.com" \
+    --role="roles/dns.peer"
+```
+
+### Required APIs
+
+| API | Purpose |
+|-----|---------|
+| `compute.googleapis.com` | VPC, PSC network management |
+| `aiplatform.googleapis.com` | Vertex AI Agent Engine |
+| `secretmanager.googleapis.com` | SAP credential storage |
+| `cloudbuild.googleapis.com` | Agent packaging and deployment |
+| `storage.googleapis.com` | Staging bucket |
+| `iam.googleapis.com` | IAM management |
+| `dns.googleapis.com` | PSC DNS configuration |
+| `servicenetworking.googleapis.com` | Service networking |
+
+### Service Accounts and IAM Roles
+
+| Service Account | Role | Purpose |
+|----------------|------|---------|
+| `agent-engine-sa` | `roles/aiplatform.user` | Vertex AI usage |
+| `agent-engine-sa` | `roles/secretmanager.secretAccessor` | Secret Manager access |
+| `agent-engine-sa` | `roles/storage.objectViewer` | Staging bucket read |
+| `agent-engine-sa` | `roles/logging.logWriter` | Cloud Logging write |
+| `agent-engine-sa` | `roles/serviceusage.serviceUsageConsumer` | Project service usage |
+| `gcp-sa-aiplatform` | `roles/compute.networkAdmin` | PSC network management |
+| `gcp-sa-aiplatform` | `roles/dns.peer` | PSC DNS peering |
+| `gcp-sa-aiplatform-re` | `roles/serviceusage.serviceUsageConsumer` | Reasoning Engine service |
+| `gcp-sa-aiplatform-cc` | `roles/serviceusage.serviceUsageConsumer` | Code Container service |
+
+---
+
+## Environment Configuration
+
+> **Note**: All configuration values shown in this documentation are **examples only**. You must replace them with values specific to your environment (project IDs, IP addresses, credentials, etc.).
+
+### Local Development Environment
+
+Create `.env` file for SAP credentials:
+
+```bash
+# sap_agent/.env
+# ⚠️ EXAMPLE VALUES - Replace with your actual SAP environment settings
+SAP_HOST=your-sap-host.com          # Example: sap-gateway.company.com
+SAP_PORT=44300                       # Example: 44300 (HTTPS) or 8000 (HTTP)
+SAP_CLIENT=100                       # Example: 100, 200, 800
+SAP_USERNAME=your_username           # Your SAP user ID
+SAP_PASSWORD=your_password           # Your SAP password
+
+# Optional configuration
+SAP_VERIFY_SSL=true                  # Enable SSL verification (default: false)
+SAP_TIMEOUT=30                       # Request timeout in seconds (default: 30)
+SAP_RETRY_ATTEMPTS=3                 # Number of retry attempts (default: 3)
+SAP_AGENT_MODEL=gemini-3-pro-preview # LLM model name (default: gemini-3-pro-preview)
+```
+
+### Google Cloud Authentication
+
+```bash
+# GCP authentication
+gcloud auth application-default login
+
+# Set project
+gcloud config set project [your-project-id]
+```
+
+### Secret Manager Setup (For Deployment)
+
+```bash
+# Create secret
+gcloud secrets create sap-credentials --replication-policy="automatic"
+
+# Set secret value
+# ⚠️ EXAMPLE VALUES - Replace with your actual SAP environment settings
+echo '{
+  "host": "YOUR_SAP_HOST_INTERNAL",
+  "port": 44300,
+  "client": "100",
+  "username": "YOUR_USERNAME",
+  "password": "YOUR_PASSWORD"
+}' | gcloud secrets versions add sap-credentials --data-file=-
+# host: Your SAP Gateway internal IP (e.g., 10.x.x.x for PSC)
+# port: SAP Gateway port (typically 44300 for HTTPS)
+# client: SAP client number (e.g., 100, 200, 800)
+# username/password: Your SAP system credentials
+```
+
+---
+
+## Usage
+
+### SAP Service Configuration
+
+Configure SAP OData services in `sap_agent/services.yaml`:
+
+```yaml
+gateway:
+  base_url_pattern: "https://{host}:{port}/sap/opu/odata"
+  auth_endpoint:
+    use_catalog_metadata: true
+
+services:
+  - id: Z_SALES_ORDER_GENAI_SRV
+    name: "Sales Order GenAI Service"
+    path: "/SAP/Z_SALES_ORDER_GENAI_SRV"
+    version: v2
+    entities:
+      - name: zsd004Set
+        key_field: Vbeln
+        description: "Sales orders entity set"
+```
+
+### Local Testing
+
+```python
+from sap_agent.agent import root_agent, sap_list_services, sap_query
+
+# List services
+services = sap_list_services()
+print(services)
+
+# Query data
+result = sap_query(
+    service="Z_SALES_ORDER_GENAI_SRV",
+    entity_set="zsd004Set",
+    top=10
+)
+print(result)
+```
+
+### Agent Engine Usage
+
+```python
+from vertexai import agent_engines
+
+# Load deployed Agent
+# ⚠️ Replace with your actual resource path from deployment output
+agent = agent_engines.get("projects/[your-project-number]/locations/[region]/reasoningEngines/[agent-id]")
+
+# Create session and query
+session = agent.create_session()
+response = session.send_message("Show me the last 10 sales orders from SAP")
+print(response.text)
+```
+
+---
+
+## Deployment
+
+### Vertex AI Agent Engine Deployment
+
+```bash
+# Run deployment script
+python scripts/deploy_agent_engine.py
+```
+
+The deployment script performs the following:
+1. Load SAP credentials from Secret Manager
+2. Wrap Agent as AdkApp
+3. Deploy to Agent Engine with PSC network configuration
+
+### Deployment Configuration (Example)
+
+> **Note**: Replace PROJECT with your actual GCP project ID.
+
+| Item | Example Value | Description |
+|------|---------------|-------------|
+| Region | us-central1 | Deployment region (adjust as needed) |
+| Model | gemini-3-pro-preview | LLM model (configurable via `SAP_AGENT_MODEL` env var) |
+| Network | PSC (Private Service Connect) | Network type |
+| Service Account | agent-engine-sa@{PROJECT}.iam.gserviceaccount.com | Replace {PROJECT} with your project ID |
+
+### Verify Deployment
+
+```bash
+# Check Agent Engine list
+gcloud ai reasoning-engines list --region=us-central1
+```
+
+For detailed deployment guide, see [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md).
+
+---
+
+## Known Issues and Limitations
+
+The following items were identified during a comprehensive code review and are documented here for transparency. They do not prevent the agent from functioning but should be addressed for production hardening.
+
+| Area | Issue | Recommendation |
+|------|-------|----------------|
+| **SSL Verification** | `verify_ssl` defaults to `False` in `SAPConnectionConfig`, which disables certificate validation | Set `verify_ssl=True` for production deployments |
+| **Debug Logging** | `print()` statements in `agent.py` output Secret Manager key names, SAP host IPs, and project IDs to Cloud Logging | Replace with structured logging; remove sensitive information from log output before production use |
+| **OData Filter Injection** | The `$filter` parameter passed to SAP OData queries is not sanitized; `utils/validators.py` contains validation functions but they are not called | Integrate input validation from `validators.py` into the query pipeline |
+| **Client Instantiation** | Every tool call creates a new `SAPClient`, `aiohttp` session, and SSL context (~200-500ms overhead per call); the module-level singleton pattern (`_sap_client_instance`) exists but is not used | Enable the existing singleton pattern or implement connection pooling |
+| **Unused Modules** | `tools/` classes (`SAPTool`, `ToolRegistry`), `protocol/`, `transports/`, `utils/logger.py`, and `utils/validators.py` are not used in Agent Engine deployment; agent.py uses direct Python functions instead | Consider removing dead code or integrating the class-based tool architecture |
+| **Test Coverage** | No automated tests currently exist (0% coverage); no test files or test infrastructure is present | Set up test infrastructure and implement unit, integration, and E2E tests |
+| **Dependency Specification** | Some runtime dependencies used in the codebase (e.g., `aiohttp`, `pydantic-settings`, `structlog`, `pyyaml`, `python-dotenv`) are not declared in `pyproject.toml`; the deploy script maintains a separate requirements list | Synchronize `pyproject.toml` dependencies with the deploy script requirements |
+
+---
+
+## Development Guide
+
+### Code Style
+
+```bash
+# Run Ruff lint
+ruff check .
+
+# Type check
+mypy sap_agent
+
+# Spell check
+codespell
+```
+
+### Testing
+
+> **Note**: No automated tests currently exist in this project. The testing infrastructure (test directories, `conftest.py`, fixtures, CI/CD integration) needs to be set up before the commands below will produce results. See the [Known Issues and Limitations](#known-issues-and-limitations) section for details.
+
+```bash
+# Run tests (once test infrastructure is in place)
+pytest
+
+# With coverage
+pytest --cov=sap_agent
+```
+
+### Adding New SAP Services
+
+1. Add service definition to `services.yaml`
+2. Verify service activation in SAP transaction `/IWFND/MAINT_SERVICE`
+3. Test locally then deploy
+
+---
+
+## Contributing
+
+This project has undergone a comprehensive code review covering architecture, security, performance, code quality, DevOps, and test coverage. Key areas where contributions are welcome:
+
+- **Security hardening**: Enabling SSL verification by default, integrating input validation, replacing debug `print()` statements with structured logging
+- **Performance optimization**: Implementing the SAPClient singleton pattern, consolidating SSL context and session creation
+- **Test infrastructure**: Setting up pytest, creating unit tests for config/auth/validators, integration tests for SAPClient, and E2E tests for agent workflows
+- **Dependency management**: Synchronizing `pyproject.toml` with the deploy script requirements and adding a CI/CD pipeline
+- **Code cleanup**: Removing or integrating unused modules (`tools/`, `protocol/`, `transports/`) and eliminating code duplication
+
+For a complete list of findings, refer to the [Known Issues and Limitations](#known-issues-and-limitations) section above.
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Gateway subprocess not available | Switched to Direct Python functions |
+| serviceUsageConsumer permission error | Grant role to service account |
+| Secret Manager import error | Lazy loading pattern applied |
+| Event loop conflict | Use `nest_asyncio` package |
+| SAP connection timeout | Verify internal IP (when using PSC) |
+
+For detailed troubleshooting, see [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md).
+
+---
+
+## License
+
+MIT License
+
+---
+
+## References
+
+- [Google ADK Documentation](https://cloud.google.com/vertex-ai/docs/reasoning-engine/overview)
+- [Vertex AI Agent Engine](https://cloud.google.com/vertex-ai/docs/reasoning-engine/deploy)
+- [SAP OData Services](https://help.sap.com/docs/SAP_NETWEAVER_AS_ABAP_751_IP)
+
+---
+
+## Documentation
+
+- [Korean Documentation (한국어 문서)](docs/KR/README.md)
